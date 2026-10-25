@@ -16,6 +16,6 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://194.233.85.194:5050}
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "${WEB_PORT:-3001}:3000"
     depends_on:
       - api

@@ -77,7 +77,7 @@ npm run dev -- -p 3000
 cp .env.example .env   # then set DB_CONNECTION_STRING
 docker compose up -d --build
 ```
-- Web Application: `http://194.233.85.194:3000`
+- Web Application: `http://194.233.85.194:3001`
 - API Base: `http://194.233.85.194:5050`
 
 The frontend calls the API from the browser, so `NEXT_PUBLIC_API_URL` is baked in at build time. To run elsewhere (e.g. locally), set `NEXT_PUBLIC_API_URL=http://localhost:5050` in `.env` and rebuild the `web` image (`docker compose build web`).
