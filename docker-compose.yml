@@ -1,0 +1,21 @@
+services:
+  api:
+    build:
+      context: ./backend/JiraClone.Api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ConnectionStrings__DefaultConnection: ${DB_CONNECTION_STRING:?Set DB_CONNECTION_STRING in .env}
+    ports:
+      - "${API_PORT:-5050}:8080"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://194.233.85.194:5050}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api

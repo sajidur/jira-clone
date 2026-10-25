@@ -1,0 +1,21 @@
+# .NET
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# Node / Next.js (see also frontend/.gitignore)
+node_modules/
+.next/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
