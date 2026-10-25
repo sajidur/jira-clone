@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using JiraClone.Api.Auth;
 using JiraClone.Api.Data;
 using JiraClone.Api.Models;
 
@@ -26,10 +28,12 @@ public interface IJqlEngineService
 public class JqlEngineService : IJqlEngineService
 {
     private readonly AppDbContext _db;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public JqlEngineService(AppDbContext db)
+    public JqlEngineService(AppDbContext db, IHttpContextAccessor httpContextAccessor)
     {
         _db = db;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<JqlSearchResult> ExecuteJqlAsync(string? jql, int? projectId = null, int startAt = 0, int maxResults = 50)
@@ -130,7 +134,7 @@ public class JqlEngineService : IJqlEngineService
                     // Normalize currentUser()
                     if (val.Equals("currentUser()", StringComparison.OrdinalIgnoreCase))
                     {
-                        val = "Sajidur Rahman";
+                        val = _httpContextAccessor.HttpContext?.User.GetDisplayName() ?? "System";
                     }
 
                     query = ApplyBinaryClause(query, field, op, val);

@@ -36,8 +36,38 @@ import { CreateIssueModal } from '@/components/CreateIssueModal';
 import { CreateProjectModal } from '@/components/CreateProjectModal';
 import { CommandPalette } from '@/components/CommandPalette';
 import { Icons } from '@/components/Icons';
+import { AuthProvider, useAuth, useCurrentUser } from '@/components/AuthProvider';
+import { LoginPage } from '@/components/LoginPage';
+import AdminConsoleView from '@/components/AdminConsoleView';
 
-export default function JiraApp() {
+export default function Page() {
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
+  );
+}
+
+function AuthGate() {
+  const { status } = useAuth();
+
+  if (status === 'loading') {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#FAFBFC] gap-4">
+        <Icons.JiraLogo className="w-10 h-10" />
+        <Icons.Refresh className="w-4 h-4 text-[#0052CC] animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === 'signed-out') return <LoginPage />;
+
+  return <JiraApp />;
+}
+
+function JiraApp() {
+  const currentUser = useCurrentUser();
+  const { isAdmin } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -335,8 +365,18 @@ export default function JiraApp() {
               onSelectIssue={(issue) => setSelectedIssueId(issue.id)}
               onOpenCreateIssue={() => openCreateIssueModal()}
               setActiveView={(v) => setActiveView(v)}
-              currentUserName="Sajidur Rahman"
+              currentUserName={currentUser.displayName}
             />
+          ) : activeView === 'admin' ? (
+            isAdmin ? (
+              <AdminConsoleView onNavigateView={(v) => setActiveView(v)} />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-2">
+                <Icons.Lock className="w-8 h-8 text-slate-400" />
+                <h3 className="font-bold text-slate-800 text-sm">You don&apos;t have access to Administration</h3>
+                <p className="text-xs text-slate-500">Ask a Jira administrator if you need to manage users.</p>
+              </div>
+            )
           ) : activeView === 'spaces' ? (
             <SpacesView
               projects={projects}
@@ -631,6 +671,8 @@ export default function JiraApp() {
       <AccountSettingsModal
         isOpen={isAccountSettingsOpen}
         onClose={() => setIsAccountSettingsOpen(false)}
+        userName={currentUser.displayName}
+        userEmail={currentUser.emailAddress}
       />
 
       {/* Global Edit Space Modal */}

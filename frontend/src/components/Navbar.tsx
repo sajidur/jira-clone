@@ -5,6 +5,7 @@ import { Project, Workspace, UserNotification } from '@/types/jira';
 import { Icons } from './Icons';
 import { SpaceAvatar } from './SpaceAvatar';
 import { NotificationsPopover } from './NotificationsPopover';
+import { useAuth, useCurrentUser, getInitials } from './AuthProvider';
 import {
   fetchNotifications,
   markNotificationAsRead,
@@ -26,7 +27,8 @@ export type ViewType =
   | 'import-export'
   | 'search'
   | 'users'
-  | 'workspace-settings';
+  | 'workspace-settings'
+  | 'admin';
 
 interface NavbarProps {
   projects: Project[];
@@ -69,6 +71,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAccountSettings,
   onSelectIssue
 }) => {
+  const currentUser = useCurrentUser();
+  const { isAdmin, signOut } = useAuth();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [projectFilterText, setProjectFilterText] = useState('');
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
@@ -79,7 +83,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const loadNotifications = useCallback(async () => {
     try {
-      const res = await fetchNotifications('Sajidur Rahman');
+      const res = await fetchNotifications(currentUser.displayName);
       setNotifications(res.notifications || []);
       setUnreadCount(res.unreadCount || 0);
       setDirectCount(res.directCount || 0);
@@ -87,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     } catch (err) {
       console.error('Failed to load notifications', err);
     }
-  }, []);
+  }, [currentUser.displayName]);
 
   useEffect(() => {
     loadNotifications();
@@ -107,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleMarkAllAsRead = async () => {
     try {
-      await markAllNotificationsAsRead('Sajidur Rahman');
+      await markAllNotificationsAsRead(currentUser.displayName);
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
       setDirectCount(0);
@@ -129,7 +133,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleClearAll = async () => {
     try {
-      await clearAllNotifications('Sajidur Rahman');
+      await clearAllNotifications(currentUser.displayName);
       setNotifications([]);
       setUnreadCount(0);
       setDirectCount(0);
@@ -783,7 +787,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => toggleDropdown('settings')}
             className={`p-2 text-[#42526E] hover:text-[#172B4D] hover:bg-[#EBECF0] rounded-full transition cursor-pointer ${
-              activeView === 'workspace-settings' || activeView === 'config' || openDropdown === 'settings'
+              activeView === 'workspace-settings' || activeView === 'config' || activeView === 'admin' || openDropdown === 'settings'
                 ? 'bg-[#DEEBFF] text-[#0052CC]'
                 : ''
             }`}
@@ -795,6 +799,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           {openDropdown === 'settings' && (
             <div className="absolute right-0 top-full mt-1.5 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs">
               <div className="px-3 py-1 font-bold text-slate-400 uppercase text-[10px]">Atlassian & Jira Administration</div>
+              {isAdmin && (
+                <div
+                  onClick={() => { setActiveView('admin'); setOpenDropdown(null); }}
+                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
+                >
+                  <Icons.Shield className="w-3.5 h-3.5 text-[#403294]" />
+                  <span className="font-semibold text-[#403294]">Administration: users, passwords & sessions</span>
+                </div>
+              )}
               <div
                 onClick={() => {
                   if (onOpenAccountSettings) onOpenAccountSettings();
@@ -849,20 +862,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={() => toggleDropdown('profile')}
-            title="Sajidur Rahman (sajidur@akij.net) - Account Settings"
+            title={`${currentUser.displayName} (${currentUser.emailAddress}) - Account Settings`}
             className="w-8 h-8 rounded-full bg-[#0052CC] text-white flex items-center justify-center font-bold text-xs ring-2 ring-white shadow-xs cursor-pointer ml-1 relative transition hover:opacity-90 shrink-0"
           >
-            <span>SR</span>
+            <span>{getInitials(currentUser.displayName)}</span>
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#36B37E] border-2 border-white rounded-full" />
           </button>
 
           {openDropdown === 'profile' && (
             <div className="absolute right-0 top-full mt-1.5 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl border border-slate-200 py-3 z-50 text-xs">
               <div className="px-4 pb-2.5 border-b border-slate-100">
-                <div className="font-bold text-slate-900 text-sm">Sajidur Rahman</div>
-                <div className="text-[11px] text-slate-400 font-mono">sajidur@akij.net</div>
-                <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">
-                  Administrator
+                <div className="font-bold text-slate-900 text-sm truncate">{currentUser.displayName}</div>
+                <div className="text-[11px] text-slate-400 font-mono truncate">{currentUser.emailAddress}</div>
+                <span
+                  className={`inline-block mt-1 px-2 py-0.5 rounded-full border text-[10px] font-bold ${
+                    isAdmin
+                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {currentUser.role || 'Member'}
                 </span>
               </div>
 
@@ -896,6 +915,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Icons.Check className="w-3.5 h-3.5 text-slate-400" />
                   <span>Assigned to me</span>
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => { setActiveView('admin'); setOpenDropdown(null); }}
+                    className="w-full text-left px-4 py-2 hover:bg-slate-50 cursor-pointer text-slate-700 flex items-center gap-2"
+                  >
+                    <Icons.Shield className="w-3.5 h-3.5 text-[#403294]" />
+                    <span>Administration</span>
+                  </button>
+                )}
+                <div className="border-t border-slate-100 my-1" />
+                <button
+                  type="button"
+                  onClick={() => { setOpenDropdown(null); signOut(); }}
+                  className="w-full text-left px-4 py-2 hover:bg-slate-50 cursor-pointer text-slate-700 flex items-center gap-2"
+                >
+                  <Icons.LogOut className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Log out</span>
                 </button>
               </div>
             </div>

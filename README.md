@@ -84,6 +84,16 @@ The frontend calls the API from the browser, so `NEXT_PUBLIC_API_URL` is baked i
 
 ---
 
+## 🔐 Login & Administration
+- Every page and API endpoint requires signing in. The login screen accepts a username or an email address.
+- A built-in **`admin`** account is created on first start. Its password comes from `Admin:Password` — `ADMIN_PASSWORD` in `.env` for Docker, or `dotnet user-secrets set "Admin:Password" "<password>"` locally. If none is set, a random password is generated and printed once in the API log. An existing admin password is never overwritten.
+- Administrators open **Settings (⚙) → Administration** to create users, set or reset passwords, grant or remove admin access, deactivate users, and revoke active sessions.
+- Existing users have no password until an administrator sets one. Users change their own password under **Account settings → Security & API**.
+- Jira REST API clients can use HTTP Basic auth (`curl -u admin:<password> http://<host>:5050/rest/api/2/myself`) or a session token (`Authorization: Bearer <token>` from `POST /api/auth/login`).
+- Login attempts are limited to 10 per minute per IP address.
+
+---
+
 ## 🗄️ Database Configuration
 The connection string is read from `ConnectionStrings:DefaultConnection`. `appsettings.json` ships with a local default (`Host=localhost;Port=5432;Database=jira;Username=jira;Password=jira`). Real credentials are never committed:
 

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using JiraClone.Api.Auth;
 using JiraClone.Api.Data;
 using JiraClone.Api.DTOs;
 using JiraClone.Api.Models;
@@ -280,7 +281,7 @@ public class IssuesController : ControllerBase
             {
                 RecipientName = issue.AssigneeName,
                 RecipientEmail = issue.AssigneeEmail,
-                ActorName = issue.ReporterName ?? "Sajidur Rahman",
+                ActorName = issue.ReporterName ?? User.GetDisplayName(),
                 Action = "assigned",
                 Category = "direct",
                 Title = $"Assigned to you: {issue.Key}",
@@ -341,7 +342,7 @@ public class IssuesController : ControllerBase
                 {
                     RecipientName = issue.AssigneeName,
                     RecipientEmail = issue.AssigneeEmail,
-                    ActorName = "Sajidur Rahman",
+                    ActorName = User.GetDisplayName(),
                     Action = "status_changed",
                     Category = "watching",
                     Title = $"{issue.Key} status updated",
@@ -381,7 +382,7 @@ public class IssuesController : ControllerBase
                 {
                     RecipientName = issue.AssigneeName,
                     RecipientEmail = issue.AssigneeEmail,
-                    ActorName = "Sajidur Rahman",
+                    ActorName = User.GetDisplayName(),
                     Action = "assigned",
                     Category = "direct",
                     Title = $"Assigned to you: {issue.Key}",
@@ -417,7 +418,7 @@ public class IssuesController : ControllerBase
         {
             issue.Activities.Add(new ActivityLog
             {
-                AuthorName = "Current User",
+                AuthorName = User.GetDisplayName(),
                 Action = "Updated",
                 Details = string.Join("; ", changes),
                 CreatedAt = DateTime.UtcNow
@@ -459,7 +460,7 @@ public class IssuesController : ControllerBase
                 {
                     RecipientName = issue.AssigneeName,
                     RecipientEmail = issue.AssigneeEmail,
-                    ActorName = "Sajidur Rahman",
+                    ActorName = User.GetDisplayName(),
                     Action = "status_changed",
                     Category = "watching",
                     Title = $"{issue.Key} status updated",
@@ -495,7 +496,7 @@ public class IssuesController : ControllerBase
         {
             issue.Activities.Add(new ActivityLog
             {
-                AuthorName = "Current User",
+                AuthorName = User.GetDisplayName(),
                 Action = "Moved",
                 Details = string.Join("; ", changes),
                 CreatedAt = DateTime.UtcNow
@@ -696,7 +697,7 @@ public class IssuesController : ControllerBase
             AssigneeAvatarUrl = !string.IsNullOrWhiteSpace(dto.AssigneeName ?? parent.AssigneeName)
                 ? $"https://ui-avatars.com/api/?name={Uri.EscapeDataString(dto.AssigneeName ?? parent.AssigneeName!)}&background=0D8ABC&color=fff"
                 : null,
-            ReporterName = "Sajidur Rahman",
+            ReporterName = User.GetDisplayName(),
             ReporterEmail = "sajidur@akij.net",
             StoryPoints = dto.StoryPoints,
             SprintId = dto.SprintId ?? parent.SprintId,
@@ -711,7 +712,7 @@ public class IssuesController : ControllerBase
 
         parent.Activities.Add(new ActivityLog
         {
-            AuthorName = "Sajidur Rahman",
+            AuthorName = User.GetDisplayName(),
             Action = "Added Child Issue",
             Details = $"Created {issueType} {key}: {child.Summary}",
             CreatedAt = DateTime.UtcNow
@@ -733,7 +734,7 @@ public class IssuesController : ControllerBase
 
         issue.Activities.Add(new ActivityLog
         {
-            AuthorName = "Sajidur Rahman",
+            AuthorName = User.GetDisplayName(),
             Action = "Updated Parent",
             Details = string.IsNullOrWhiteSpace(issue.ParentIssueKey) ? $"Removed parent (was {oldParent})" : $"Set parent to {issue.ParentIssueKey}",
             CreatedAt = DateTime.UtcNow
@@ -858,7 +859,7 @@ public class IssuesController : ControllerBase
 
         sourceIssue.Activities.Add(new ActivityLog
         {
-            AuthorName = "Sajidur Rahman",
+            AuthorName = User.GetDisplayName(),
             Action = "Linked Issue",
             Details = $"{link.Relationship} {targetIssue.Key}: {targetIssue.Summary}",
             CreatedAt = DateTime.UtcNow

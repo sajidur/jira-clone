@@ -51,7 +51,6 @@ export const ForYouView: React.FC<ForYouViewProps> = ({
   const assignedToMe = issues.filter(
     (i) =>
       i.assigneeName?.toLowerCase().includes(currentUserName.toLowerCase()) ||
-      i.assigneeName?.toLowerCase().includes('sajidur') ||
       !i.assigneeName // Also show unassigned in assigned tab if small dataset
   );
 

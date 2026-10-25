@@ -1,4 +1,6 @@
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace JiraClone.Api.Models;
 
@@ -19,4 +21,11 @@ public class AppUser
     public string? JobTitle { get; set; } = "Software Engineer";
     public string? TimeZone { get; set; } = "UTC";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastLoginAt { get; set; }
+
+    [JsonIgnore]
+    public string? PasswordHash { get; set; }
+
+    [NotMapped]
+    public bool HasPassword => !string.IsNullOrEmpty(PasswordHash);
 }

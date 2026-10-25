@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Icons } from './Icons';
+import { changePassword } from '@/lib/auth';
 
 interface AccountSettingsModalProps {
   isOpen: boolean;
@@ -30,9 +31,18 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   const [notifyOnSprint, setNotifyOnSprint] = useState(true);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
+  // Change password
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const profileStorageKey = `jira_account_profile:${userEmail}`;
+
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('jira_account_profile');
+      const stored = localStorage.getItem(profileStorageKey);
       if (stored) {
         const data = JSON.parse(stored);
         if (data.fullName) setFullName(data.fullName);
@@ -48,11 +58,43 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword) {
+      setPasswordStatus({ ok: false, message: 'Enter your current password and a new password.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus({ ok: false, message: "The new passwords don't match." });
+      return;
+    }
+    setPasswordSaving(true);
+    setPasswordStatus(null);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordStatus({ ok: true, message: 'Password updated. Your other devices have been signed out.' });
+    } catch (err: any) {
+      setPasswordStatus({ ok: false, message: err.message || 'Failed to change password' });
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  // The tab sits inside the profile form, so Enter must not submit that form
+  const submitPasswordOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleChangePassword();
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     try {
       localStorage.setItem(
-        'jira_account_profile',
+        profileStorageKey,
         JSON.stringify({
           fullName,
           publicName,
@@ -328,24 +370,73 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                 </p>
               </div>
 
-              <div>
-                <label className="block font-bold text-[#172B4D] mb-1">Personal API Token</label>
-                <div className="flex items-center gap-2">
+              <div className="space-y-3">
+                <div className="font-bold text-[#172B4D]">Change password</div>
+                {passwordStatus && (
+                  <div
+                    className={`p-2.5 rounded-lg border text-xs font-semibold ${
+                      passwordStatus.ok
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : 'bg-rose-50 border-rose-200 text-rose-700'
+                    }`}
+                  >
+                    {passwordStatus.message}
+                  </div>
+                )}
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Current password</label>
                   <input
                     type="password"
-                    readOnly
-                    value="jira_pat_akij_98fa72348df89b21cd77"
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 font-mono text-xs"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    onKeyDown={submitPasswordOnEnter}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-[#0052cc]/20 focus:border-[#0052cc]"
                   />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">New password</label>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      onKeyDown={submitPasswordOnEnter}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-[#0052cc]/20 focus:border-[#0052cc]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Confirm new password</label>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onKeyDown={submitPasswordOnEnter}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-[#0052cc]/20 focus:border-[#0052cc]"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-slate-400">At least 8 characters.</span>
                   <button
                     type="button"
-                    onClick={() => alert('API token copied to clipboard')}
-                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg border border-slate-300 cursor-pointer"
+                    onClick={handleChangePassword}
+                    disabled={passwordSaving}
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#0052cc] hover:bg-[#0047b3] disabled:opacity-60 shadow-xs transition cursor-pointer"
                   >
-                    Copy
+                    {passwordSaving ? 'Updating…' : 'Update password'}
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Use this personal access token for Git integrations, CI/CD, and CLI tools.</p>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200">
+                <label className="block font-bold text-[#172B4D] mb-1">REST API access</label>
+                <p className="text-[11px] text-slate-500">
+                  Jira REST API clients and scripts can authenticate with HTTP Basic auth using your username or email
+                  and password, e.g. <span className="font-mono text-slate-700">curl -u {userEmail}:&lt;password&gt; …/rest/api/2/myself</span>
+                </p>
               </div>
             </div>
           )}

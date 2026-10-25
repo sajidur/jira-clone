@@ -13,6 +13,7 @@ import {
 } from '@/types/jira';
 import { IssueTypeIcon, PriorityIcon, Icons } from './Icons';
 import { SpaceAvatar } from './SpaceAvatar';
+import { useCurrentUser } from './AuthProvider';
 import {
   updateIssue,
   deleteIssue,
@@ -48,6 +49,7 @@ export const IssueDetailModal: React.FC<IssueDetailModalProps> = ({
   onClose,
   onIssueUpdated
 }) => {
+  const currentUser = useCurrentUser();
   const [currentId, setCurrentId] = useState<number>(issueId);
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(true);
@@ -311,8 +313,8 @@ export const IssueDetailModal: React.FC<IssueDetailModalProps> = ({
     e.preventDefault();
     if (!newComment.trim()) return;
     await addComment(issue.id, {
-      authorName: 'Sajidur Rahman',
-      authorEmail: 'sajidur@akij.net',
+      authorName: currentUser.displayName,
+      authorEmail: currentUser.emailAddress,
       body: newComment.trim()
     });
     setNewComment('');
@@ -325,7 +327,7 @@ export const IssueDetailModal: React.FC<IssueDetailModalProps> = ({
     e.preventDefault();
     if (timeSpentMins <= 0) return;
     await logWork(issue.id, {
-      authorName: 'Sajidur Rahman',
+      authorName: currentUser.displayName,
       timeSpentMinutes: timeSpentMins,
       comment: worklogComment.trim() || undefined
     });
@@ -353,8 +355,8 @@ export const IssueDetailModal: React.FC<IssueDetailModalProps> = ({
       }
 
       await logWork(issue.id, {
-        authorName: 'Sajidur Rahman',
-        authorEmail: 'sajidur@akij.net',
+        authorName: currentUser.displayName,
+        authorEmail: currentUser.emailAddress,
         timeSpentMinutes: parsedSpent,
         remainingEstimateMinutes: remMinutes,
         comment: logDescription.trim() || undefined,
@@ -1253,8 +1255,8 @@ export const IssueDetailModal: React.FC<IssueDetailModalProps> = ({
                           type="button"
                           onClick={() => {
                             handleUpdate('assignee', {
-                              assigneeName: 'Sajidur Rahman',
-                              assigneeEmail: 'sajidur@akij.net'
+                              assigneeName: currentUser.displayName,
+                              assigneeEmail: currentUser.emailAddress
                             });
                           }}
                           className="text-[11px] text-[#0052cc] hover:underline font-semibold shrink-0 cursor-pointer"

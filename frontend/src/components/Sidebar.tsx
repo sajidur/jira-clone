@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Project, Workspace } from '@/types/jira';
 import { ViewType } from './Navbar';
 import { Icons } from './Icons';
+import { useCurrentUser, getInitials } from './AuthProvider';
 import { SpaceAvatar } from './SpaceAvatar';
 
 interface SidebarProps {
@@ -39,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAccountSettings,
   onEditSpace
 }) => {
+  const currentUser = useCurrentUser();
   const [collapsed, setCollapsed] = useState(false);
   const [showSpacesList, setShowSpacesList] = useState(true);
 
@@ -332,7 +334,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title="Account settings & profile"
         >
           <div className="w-5 h-5 rounded-full bg-[#0052cc] text-white font-bold text-[9px] flex items-center justify-center shrink-0">
-            SR
+            {getInitials(currentUser.displayName)}
           </div>
           {!collapsed && (
             <div className="flex items-center justify-between flex-1 truncate">

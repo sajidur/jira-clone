@@ -121,6 +121,39 @@ export interface AppUser {
   jobTitle?: string;
   groupsJson?: string;
   appAccessJson?: string;
+  createdAt?: string;
+  lastLoginAt?: string | null;
+  hasPassword?: boolean;
+}
+
+export interface AdminUser extends AppUser {
+  hasPassword: boolean;
+  activeSessions: number;
+}
+
+export interface AdminSession {
+  id: number;
+  userId: number;
+  displayName: string;
+  emailAddress: string;
+  avatarUrl?: string;
+  role: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  isCurrent: boolean;
+}
+
+export interface AdminOverview {
+  totalUsers: number;
+  activeUsers: number;
+  deactivatedUsers: number;
+  administrators: number;
+  usersWithoutPassword: number;
+  activeSessions: number;
+  recentLogins: Pick<AppUser, 'id' | 'displayName' | 'emailAddress' | 'avatarUrl' | 'role' | 'lastLoginAt'>[];
 }
 
 export interface UserGroup {

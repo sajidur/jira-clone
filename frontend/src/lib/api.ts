@@ -32,28 +32,31 @@ import {
   IssueLinkItem,
   ChildIssueItem,
   UserNotification,
-  NotificationsResponse
+  NotificationsResponse,
+  AdminUser,
+  AdminSession,
+  AdminOverview
 } from '@/types/jira';
+import { API_BASE, authFetch, withAccessToken } from './auth';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050';
 
 export async function fetchProjects(workspaceId?: number): Promise<Project[]> {
   const url = workspaceId
     ? `${API_BASE}/api/projects?workspaceId=${workspaceId}`
     : `${API_BASE}/api/projects`;
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await authFetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch projects');
   return res.json();
 }
 
 export async function fetchProject(id: number): Promise<Project> {
-  const res = await fetch(`${API_BASE}/api/projects/${id}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/projects/${id}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch project');
   return res.json();
 }
 
 export async function createProject(data: Partial<Project>): Promise<Project> {
-  const res = await fetch(`${API_BASE}/api/projects`, {
+  const res = await authFetch(`${API_BASE}/api/projects`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -63,7 +66,7 @@ export async function createProject(data: Partial<Project>): Promise<Project> {
 }
 
 export async function updateProject(id: number, data: Partial<Project>): Promise<Project> {
-  const res = await fetch(`${API_BASE}/api/projects/${id}`, {
+  const res = await authFetch(`${API_BASE}/api/projects/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -73,7 +76,7 @@ export async function updateProject(id: number, data: Partial<Project>): Promise
 }
 
 export async function deleteProject(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/projects/${id}`, {
+  const res = await authFetch(`${API_BASE}/api/projects/${id}`, {
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Failed to delete project');
@@ -115,7 +118,7 @@ export async function fetchIssues(
   }
 
   const query = params.toString();
-  const res = await fetch(`${API_BASE}/api/issues${query ? `?${query}` : ''}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/issues${query ? `?${query}` : ''}`, { cache: 'no-store' });
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
     console.error('Failed to fetch issues:', res.status, errText);
@@ -125,13 +128,13 @@ export async function fetchIssues(
 }
 
 export async function fetchIssue(idOrKey: string | number): Promise<Issue> {
-  const res = await fetch(`${API_BASE}/api/issues/${idOrKey}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/issues/${idOrKey}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch issue');
   return res.json();
 }
 
 export async function createIssue(issue: Partial<Issue>): Promise<Issue> {
-  const res = await fetch(`${API_BASE}/api/issues`, {
+  const res = await authFetch(`${API_BASE}/api/issues`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(issue)
@@ -144,7 +147,7 @@ export async function createIssue(issue: Partial<Issue>): Promise<Issue> {
 }
 
 export async function updateIssue(id: number, issue: Partial<Issue>): Promise<Issue> {
-  const res = await fetch(`${API_BASE}/api/issues/${id}`, {
+  const res = await authFetch(`${API_BASE}/api/issues/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(issue)
@@ -156,23 +159,35 @@ export async function updateIssue(id: number, issue: Partial<Issue>): Promise<Is
   return res.json();
 }
 
-export async function moveIssue(id: number, status: string, sprintId?: number | null): Promise<Issue> {
-  return updateIssue(id, { status, sprintId });
+export async function moveIssue(
+  id: number,
+  move: { status?: string; sprintId?: number | null; order?: number }
+): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/issues/${id}/move`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    // The API uses sprintId 0 for "move to backlog"
+    body: JSON.stringify({ ...move, sprintId: move.sprintId === null ? 0 : move.sprintId })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to move issue');
+  }
 }
 
 export async function deleteIssue(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/issues/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/issues/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete issue');
 }
 
 export async function fetchSprints(projectId: number): Promise<Sprint[]> {
-  const res = await fetch(`${API_BASE}/api/sprints/project/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/sprints/project/${projectId}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch sprints');
   return res.json();
 }
 
 export async function createSprint(sprint: Partial<Sprint>): Promise<Sprint> {
-  const res = await fetch(`${API_BASE}/api/sprints`, {
+  const res = await authFetch(`${API_BASE}/api/sprints`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(sprint)
@@ -182,7 +197,7 @@ export async function createSprint(sprint: Partial<Sprint>): Promise<Sprint> {
 }
 
 export async function startSprint(id: number, startDate?: string, endDate?: string): Promise<Sprint> {
-  const res = await fetch(`${API_BASE}/api/sprints/${id}/start`, {
+  const res = await authFetch(`${API_BASE}/api/sprints/${id}/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ startDate, endDate })
@@ -193,13 +208,13 @@ export async function startSprint(id: number, startDate?: string, endDate?: stri
 
 export async function completeSprint(id: number, moveToSprintId?: number | null): Promise<Sprint> {
   const url = `${API_BASE}/api/sprints/${id}/complete${moveToSprintId ? `?moveToSprintId=${moveToSprintId}` : ''}`;
-  const res = await fetch(url, { method: 'POST' });
+  const res = await authFetch(url, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to complete sprint');
   return res.json();
 }
 
 export async function updateSprint(id: number, data: Partial<Sprint>): Promise<Sprint> {
-  const res = await fetch(`${API_BASE}/api/sprints/${id}`, {
+  const res = await authFetch(`${API_BASE}/api/sprints/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -209,18 +224,18 @@ export async function updateSprint(id: number, data: Partial<Sprint>): Promise<S
 }
 
 export async function deleteSprint(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/sprints/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/sprints/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete sprint');
 }
 
 export async function fetchUsers(): Promise<AppUser[]> {
-  const res = await fetch(`${API_BASE}/api/users`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/users`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function createUser(data: Partial<AppUser>): Promise<AppUser> {
-  const res = await fetch(`${API_BASE}/api/users`, {
+  const res = await authFetch(`${API_BASE}/api/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -230,7 +245,7 @@ export async function createUser(data: Partial<AppUser>): Promise<AppUser> {
 }
 
 export async function updateUser(id: number, data: Partial<AppUser>): Promise<AppUser> {
-  const res = await fetch(`${API_BASE}/api/users/${id}`, {
+  const res = await authFetch(`${API_BASE}/api/users/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -240,24 +255,24 @@ export async function updateUser(id: number, data: Partial<AppUser>): Promise<Ap
 }
 
 export async function deleteUser(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/users/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/users/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to deactivate user');
 }
 
 export async function fetchRoles(): Promise<{ name: string; description: string }[]> {
-  const res = await fetch(`${API_BASE}/api/users/roles`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/users/roles`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function fetchProjectMembers(projectId: number): Promise<ProjectMember[]> {
-  const res = await fetch(`${API_BASE}/api/users/project-members/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/users/project-members/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function addProjectMember(data: { projectId: number; userId: number; role: string }): Promise<ProjectMember> {
-  const res = await fetch(`${API_BASE}/api/users/project-members`, {
+  const res = await authFetch(`${API_BASE}/api/users/project-members`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -267,18 +282,18 @@ export async function addProjectMember(data: { projectId: number; userId: number
 }
 
 export async function removeProjectMember(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/users/project-members/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/users/project-members/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to remove project member');
 }
 
 export async function fetchProjectPermissions(projectId: number): Promise<{ definitions: PermissionDefinition[]; matrix: ProjectPermission[] }> {
-  const res = await fetch(`${API_BASE}/api/users/permissions/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/users/permissions/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return { definitions: [], matrix: [] };
   return res.json();
 }
 
 export async function toggleProjectPermission(data: { projectId: number; permissionKey: string; role: string; isAllowed: boolean }): Promise<ProjectPermission> {
-  const res = await fetch(`${API_BASE}/api/users/permissions/toggle`, {
+  const res = await authFetch(`${API_BASE}/api/users/permissions/toggle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -289,13 +304,13 @@ export async function toggleProjectPermission(data: { projectId: number; permiss
 
 // User Groups
 export async function fetchGroups(): Promise<UserGroup[]> {
-  const res = await fetch(`${API_BASE}/api/users/groups`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/users/groups`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function createGroup(data: { name: string; description: string; isDefault: boolean }): Promise<UserGroup> {
-  const res = await fetch(`${API_BASE}/api/users/groups`, {
+  const res = await authFetch(`${API_BASE}/api/users/groups`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -308,13 +323,13 @@ export async function createGroup(data: { name: string; description: string; isD
 }
 
 export async function deleteGroup(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/users/groups/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/users/groups/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete group');
 }
 
 // Project Teams
 export async function fetchTeams(projectId: number): Promise<ProjectTeam[]> {
-  const res = await fetch(`${API_BASE}/api/users/teams/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/users/teams/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
@@ -327,7 +342,7 @@ export async function createTeam(data: {
   leadEmail?: string;
   members?: string[];
 }): Promise<ProjectTeam> {
-  const res = await fetch(`${API_BASE}/api/users/teams`, {
+  const res = await authFetch(`${API_BASE}/api/users/teams`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -340,25 +355,25 @@ export async function createTeam(data: {
 }
 
 export async function deleteTeam(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/users/teams/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/users/teams/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete team');
 }
 
 // App Access & Licensing
 export async function fetchAppAccess(): Promise<AppAccessSetting[]> {
-  const res = await fetch(`${API_BASE}/api/users/app-access`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/users/app-access`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function toggleAppAccess(id: number): Promise<AppAccessSetting> {
-  const res = await fetch(`${API_BASE}/api/users/app-access/toggle/${id}`, { method: 'POST' });
+  const res = await authFetch(`${API_BASE}/api/users/app-access/toggle/${id}`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to toggle app access');
   return res.json();
 }
 
 export async function updateAppAccess(id: number, data: { licensedSeats?: number; defaultGroup?: string }): Promise<AppAccessSetting> {
-  const res = await fetch(`${API_BASE}/api/users/app-access/${id}`, {
+  const res = await authFetch(`${API_BASE}/api/users/app-access/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -368,13 +383,13 @@ export async function updateAppAccess(id: number, data: { licensedSeats?: number
 }
 
 export async function fetchComments(issueId: number) {
-  const res = await fetch(`${API_BASE}/api/issues/${issueId}/comments`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/issues/${issueId}/comments`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function addComment(issueId: number, body: string, authorName = 'Sajidur Rahman', authorEmail = 'sajidur@akij.net') {
-  const res = await fetch(`${API_BASE}/api/issues/${issueId}/comments`, {
+  const res = await authFetch(`${API_BASE}/api/issues/${issueId}/comments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ body, authorName, authorEmail })
@@ -384,7 +399,7 @@ export async function addComment(issueId: number, body: string, authorName = 'Sa
 }
 
 export async function fetchWorklogs(issueId: number) {
-  const res = await fetch(`${API_BASE}/api/issues/${issueId}/worklogs`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/issues/${issueId}/worklogs`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
@@ -420,7 +435,7 @@ export async function addWorklog(
     };
   }
 
-  const res = await fetch(`${API_BASE}/api/issues/${issueId}/worklogs`, {
+  const res = await authFetch(`${API_BASE}/api/issues/${issueId}/worklogs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -465,49 +480,49 @@ export function parseJiraTimeToMinutes(input: string): number {
 }
 
 export async function fetchActivityLogs(issueId: number) {
-  const res = await fetch(`${API_BASE}/api/issues/${issueId}/activities`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/issues/${issueId}/activities`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function fetchBurndown(sprintId: number): Promise<BurndownData> {
-  const res = await fetch(`${API_BASE}/api/reports/burndown/${sprintId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/reports/burndown/${sprintId}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch burndown data');
   return res.json();
 }
 
 export async function fetchVelocity(projectId: number): Promise<VelocityItem[]> {
-  const res = await fetch(`${API_BASE}/api/reports/velocity/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/reports/velocity/${projectId}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch velocity data');
   return res.json();
 }
 
 export async function fetchWorkload(projectId: number): Promise<WorkloadItem[]> {
-  const res = await fetch(`${API_BASE}/api/reports/workload/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/reports/workload/${projectId}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch workload data');
   return res.json();
 }
 
 export async function fetchProjectSummary(projectId: number): Promise<ProjectSummaryReport> {
-  const res = await fetch(`${API_BASE}/api/reports/summary/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/reports/summary/${projectId}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch summary data');
   return res.json();
 }
 
 export async function fetchTimeTracking(projectId: number): Promise<any[]> {
-  const res = await fetch(`${API_BASE}/api/reports/timetracking/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/reports/timetracking/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function fetchVersions(projectId: number): Promise<ProjectVersion[]> {
-  const res = await fetch(`${API_BASE}/api/releases/project/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/releases/project/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function createVersion(data: { projectId: number; name: string; description?: string }): Promise<ProjectVersion> {
-  const res = await fetch(`${API_BASE}/api/releases`, {
+  const res = await authFetch(`${API_BASE}/api/releases`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -517,20 +532,20 @@ export async function createVersion(data: { projectId: number; name: string; des
 }
 
 export async function releaseVersion(id: number): Promise<ProjectVersion> {
-  const res = await fetch(`${API_BASE}/api/releases/${id}/release`, { method: 'POST' });
+  const res = await authFetch(`${API_BASE}/api/releases/${id}/release`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to release version');
   return res.json();
 }
 
 // Workflow Statuses
 export async function fetchWorkflowStatuses(projectId: number): Promise<WorkflowStatus[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/statuses/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/configuration/statuses/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function createWorkflowStatus(data: { projectId: number; name: string; category: string; color: string; wipLimit?: number }): Promise<WorkflowStatus> {
-  const res = await fetch(`${API_BASE}/api/configuration/statuses`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/statuses`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -540,7 +555,7 @@ export async function createWorkflowStatus(data: { projectId: number; name: stri
 }
 
 export async function updateWorkflowStatus(id: number, data: { projectId: number; name: string; category: string; color: string; wipLimit?: number }): Promise<WorkflowStatus> {
-  const res = await fetch(`${API_BASE}/api/configuration/statuses/${id}`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/statuses/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -550,12 +565,12 @@ export async function updateWorkflowStatus(id: number, data: { projectId: number
 }
 
 export async function deleteWorkflowStatus(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/statuses/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/configuration/statuses/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete status');
 }
 
 export async function reorderWorkflowStatuses(projectId: number, statusIdsInOrder: number[]): Promise<WorkflowStatus[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/statuses/reorder`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/statuses/reorder`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ projectId, statusIdsInOrder })
@@ -566,7 +581,7 @@ export async function reorderWorkflowStatuses(projectId: number, statusIdsInOrde
 
 // Custom Fields
 export async function fetchCustomFields(projectId: number): Promise<CustomFieldDefinition[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/custom-fields/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/configuration/custom-fields/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
@@ -580,7 +595,7 @@ export async function createCustomField(data: {
   isRequired: boolean;
   showInListView: boolean;
 }): Promise<CustomFieldDefinition> {
-  const res = await fetch(`${API_BASE}/api/configuration/custom-fields`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/custom-fields`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -590,13 +605,13 @@ export async function createCustomField(data: {
 }
 
 export async function deleteCustomField(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/custom-fields/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/configuration/custom-fields/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete custom field');
 }
 
 // Transitions
 export async function fetchWorkflowTransitions(projectId: number): Promise<WorkflowTransition[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/transitions/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/configuration/transitions/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
@@ -611,7 +626,7 @@ export async function createWorkflowTransition(data: {
   autoResolution?: string;
   autoAssignee?: string;
 }): Promise<WorkflowTransition> {
-  const res = await fetch(`${API_BASE}/api/configuration/transitions`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/transitions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -630,7 +645,7 @@ export async function updateWorkflowTransition(id: number, data: {
   autoResolution?: string;
   autoAssignee?: string;
 }): Promise<WorkflowTransition> {
-  const res = await fetch(`${API_BASE}/api/configuration/transitions/${id}`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/transitions/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -640,7 +655,7 @@ export async function updateWorkflowTransition(id: number, data: {
 }
 
 export async function applyWorkflowTemplate(projectId: number, template: 'scrum' | 'kanban' | 'enterprise_qa'): Promise<{ statuses: WorkflowStatus[]; transitions: WorkflowTransition[] }> {
-  const res = await fetch(`${API_BASE}/api/configuration/workflow-template`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/workflow-template`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ projectId, template })
@@ -650,7 +665,7 @@ export async function applyWorkflowTemplate(projectId: number, template: 'scrum'
 }
 
 export async function deleteWorkflowTransition(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/transitions/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/configuration/transitions/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete transition');
 }
 
@@ -660,7 +675,7 @@ export async function toggleWorkflowTransition(data: {
   toStatus: string;
   allowed: boolean;
 }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/transitions/toggle-matrix`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/transitions/toggle-matrix`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -676,7 +691,7 @@ export const toggleTransitionMatrix = toggleWorkflowTransition;
 
 // Workflow Rules (Automations)
 export async function fetchWorkflowRules(projectId: number): Promise<WorkflowRule[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/rules/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/configuration/rules/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
@@ -689,7 +704,7 @@ export async function createWorkflowRule(data: {
   actionType: string;
   actionValue: string;
 }): Promise<WorkflowRule> {
-  const res = await fetch(`${API_BASE}/api/configuration/rules`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/rules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -699,38 +714,38 @@ export async function createWorkflowRule(data: {
 }
 
 export async function toggleWorkflowRule(id: number): Promise<WorkflowRule> {
-  const res = await fetch(`${API_BASE}/api/configuration/rules/${id}/toggle`, { method: 'PUT' });
+  const res = await authFetch(`${API_BASE}/api/configuration/rules/${id}/toggle`, { method: 'PUT' });
   if (!res.ok) throw new Error('Failed to toggle workflow rule');
   return res.json();
 }
 
 export async function deleteWorkflowRule(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/rules/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/configuration/rules/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete workflow rule');
 }
 
 // Jira Import & Export
 export function getJiraExportJsonUrl(projectId?: number): string {
-  return `${API_BASE}/api/jiraexportimport/export/json${projectId ? `?projectId=${projectId}` : ''}`;
+  return withAccessToken(`${API_BASE}/api/jiraexportimport/export/json${projectId ? `?projectId=${projectId}` : ''}`);
 }
 
 export function getJiraExportCsvUrl(projectId?: number): string {
-  return `${API_BASE}/api/jiraexportimport/export/csv${projectId ? `?projectId=${projectId}` : ''}`;
+  return withAccessToken(`${API_BASE}/api/jiraexportimport/export/csv${projectId ? `?projectId=${projectId}` : ''}`);
 }
 
 export function getSampleJiraJsonUrl(): string {
-  return `${API_BASE}/api/jiraexportimport/sample/json`;
+  return withAccessToken(`${API_BASE}/api/jiraexportimport/sample/json`);
 }
 
 export function getSampleJiraCsvUrl(): string {
-  return `${API_BASE}/api/jiraexportimport/sample/csv`;
+  return withAccessToken(`${API_BASE}/api/jiraexportimport/sample/csv`);
 }
 
 export async function importJiraJson(file: File, targetProjectId?: number): Promise<JiraImportResult> {
   const formData = new FormData();
   formData.append('file', file);
   const url = `${API_BASE}/api/jiraexportimport/import/json${targetProjectId ? `?targetProjectId=${targetProjectId}` : ''}`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'POST',
     body: formData
   });
@@ -741,7 +756,7 @@ export async function importJiraCsv(file: File, targetProjectId: number): Promis
   const formData = new FormData();
   formData.append('file', file);
   const url = `${API_BASE}/api/jiraexportimport/import/csv?targetProjectId=${targetProjectId}`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'POST',
     body: formData
   });
@@ -758,7 +773,7 @@ export async function searchJql(
   startAt: number = 0,
   maxResults: number = 50
 ): Promise<JqlSearchResult> {
-  const res = await fetch(`${API_BASE}/api/jql/search`, {
+  const res = await authFetch(`${API_BASE}/api/jql/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jql, projectId, startAt, maxResults })
@@ -768,7 +783,7 @@ export async function searchJql(
 }
 
 export async function fetchSavedFilters(): Promise<SavedFilter[]> {
-  const res = await fetch(`${API_BASE}/api/jql/saved-filters`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/jql/saved-filters`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
@@ -780,7 +795,7 @@ export async function createSavedFilter(data: {
   ownerName?: string;
   isFavorite?: boolean;
 }): Promise<SavedFilter> {
-  const res = await fetch(`${API_BASE}/api/jql/saved-filters`, {
+  const res = await authFetch(`${API_BASE}/api/jql/saved-filters`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -790,7 +805,7 @@ export async function createSavedFilter(data: {
 }
 
 export async function deleteSavedFilter(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/jql/saved-filters/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/jql/saved-filters/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete saved filter');
 }
 
@@ -799,7 +814,7 @@ export async function fetchJqlAutocomplete(): Promise<{
   operators: string[];
   keywords: string[];
 }> {
-  const res = await fetch(`${API_BASE}/api/jql/autocomplete`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/jql/autocomplete`, { cache: 'no-store' });
   if (!res.ok) return { fields: [], operators: [], keywords: [] };
   return res.json();
 }
@@ -809,13 +824,13 @@ export async function fetchJqlAutocomplete(): Promise<{
 // ---------------------------------------------------------------------------
 
 export async function fetchComponents(projectId: number): Promise<ProjectComponent[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/components/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/configuration/components/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function createComponent(data: Partial<ProjectComponent>): Promise<ProjectComponent> {
-  const res = await fetch(`${API_BASE}/api/configuration/components`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/components`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -825,18 +840,18 @@ export async function createComponent(data: Partial<ProjectComponent>): Promise<
 }
 
 export async function deleteComponent(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/components/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/configuration/components/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete component');
 }
 
 export async function fetchIssueTypes(projectId: number): Promise<ProjectIssueType[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/issue-types/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/configuration/issue-types/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function createIssueType(data: Partial<ProjectIssueType>): Promise<ProjectIssueType> {
-  const res = await fetch(`${API_BASE}/api/configuration/issue-types`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/issue-types`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -846,18 +861,18 @@ export async function createIssueType(data: Partial<ProjectIssueType>): Promise<
 }
 
 export async function deleteIssueType(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/issue-types/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/configuration/issue-types/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete issue type');
 }
 
 export async function fetchPriorities(projectId: number): Promise<ProjectPriority[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/priorities/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/configuration/priorities/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function createPriority(data: Partial<ProjectPriority>): Promise<ProjectPriority> {
-  const res = await fetch(`${API_BASE}/api/configuration/priorities`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/priorities`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -867,18 +882,18 @@ export async function createPriority(data: Partial<ProjectPriority>): Promise<Pr
 }
 
 export async function deletePriority(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/priorities/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/configuration/priorities/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete priority');
 }
 
 export async function fetchResolutions(projectId: number): Promise<ProjectResolution[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/resolutions/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/configuration/resolutions/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function createResolution(data: Partial<ProjectResolution>): Promise<ProjectResolution> {
-  const res = await fetch(`${API_BASE}/api/configuration/resolutions`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/resolutions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -888,18 +903,18 @@ export async function createResolution(data: Partial<ProjectResolution>): Promis
 }
 
 export async function deleteResolution(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/resolutions/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/configuration/resolutions/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete resolution');
 }
 
 export async function fetchWebhooks(projectId: number): Promise<ProjectWebhook[]> {
-  const res = await fetch(`${API_BASE}/api/configuration/webhooks/${projectId}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/configuration/webhooks/${projectId}`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function createWebhook(data: Partial<ProjectWebhook>): Promise<ProjectWebhook> {
-  const res = await fetch(`${API_BASE}/api/configuration/webhooks`, {
+  const res = await authFetch(`${API_BASE}/api/configuration/webhooks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -909,7 +924,7 @@ export async function createWebhook(data: Partial<ProjectWebhook>): Promise<Proj
 }
 
 export async function deleteWebhook(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/configuration/webhooks/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/configuration/webhooks/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete webhook');
 }
 
@@ -918,13 +933,13 @@ export async function deleteWebhook(id: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function fetchWorkspaces(): Promise<Workspace[]> {
-  const res = await fetch(`${API_BASE}/api/workspaces`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/workspaces`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function fetchWorkspace(id: number): Promise<Workspace> {
-  const res = await fetch(`${API_BASE}/api/workspaces/${id}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/workspaces/${id}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch workspace');
   return res.json();
 }
@@ -936,7 +951,7 @@ export async function createWorkspace(data: {
   domain?: string;
   planTier?: string;
 }): Promise<Workspace> {
-  const res = await fetch(`${API_BASE}/api/workspaces`, {
+  const res = await authFetch(`${API_BASE}/api/workspaces`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -949,7 +964,7 @@ export async function createWorkspace(data: {
 }
 
 export async function updateWorkspaceGeneral(id: number, data: Partial<Workspace>): Promise<Workspace> {
-  const res = await fetch(`${API_BASE}/api/workspaces/${id}`, {
+  const res = await authFetch(`${API_BASE}/api/workspaces/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -965,7 +980,7 @@ export async function updateWorkspaceSecurity(id: number, data: {
   sessionTimeoutMinutes: number;
   ipAllowlist?: string;
 }): Promise<Workspace> {
-  const res = await fetch(`${API_BASE}/api/workspaces/${id}/security`, {
+  const res = await authFetch(`${API_BASE}/api/workspaces/${id}/security`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -983,7 +998,7 @@ export async function updateWorkspaceFeatures(id: number, data: {
   enableExternalSharing: boolean;
   enableAiAssistance: boolean;
 }): Promise<Workspace> {
-  const res = await fetch(`${API_BASE}/api/workspaces/${id}/features`, {
+  const res = await authFetch(`${API_BASE}/api/workspaces/${id}/features`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -993,13 +1008,13 @@ export async function updateWorkspaceFeatures(id: number, data: {
 }
 
 export async function fetchWorkspaceMembers(workspaceId: number): Promise<WorkspaceMember[]> {
-  const res = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/members`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/workspaces/${workspaceId}/members`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function addWorkspaceMember(workspaceId: number, data: { userId: number; role?: string }): Promise<WorkspaceMember> {
-  const res = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/members`, {
+  const res = await authFetch(`${API_BASE}/api/workspaces/${workspaceId}/members`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -1012,12 +1027,12 @@ export async function addWorkspaceMember(workspaceId: number, data: { userId: nu
 }
 
 export async function removeWorkspaceMember(workspaceId: number, memberId: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/members/${memberId}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/workspaces/${workspaceId}/members/${memberId}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to remove workspace member');
 }
 
 export async function fetchWorkspaceAuditLogs(workspaceId: number): Promise<WorkspaceAuditLog[]> {
-  const res = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/audit-logs`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/workspaces/${workspaceId}/audit-logs`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
@@ -1026,7 +1041,7 @@ export async function fetchWorkspaceAuditLogs(workspaceId: number): Promise<Work
 // CHILD ISSUES, SUBTASKS & ISSUE LINKS
 // -------------------------------------------------------------
 export async function fetchChildIssues(idOrKey: string | number): Promise<ChildIssueItem[]> {
-  const res = await fetch(`${API_BASE}/api/issues/${idOrKey}/children`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/issues/${idOrKey}/children`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
@@ -1043,7 +1058,7 @@ export async function createChildIssue(
     sprintId?: number;
   }
 ): Promise<Issue> {
-  const res = await fetch(`${API_BASE}/api/issues/${parentKey}/children`, {
+  const res = await authFetch(`${API_BASE}/api/issues/${parentKey}/children`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -1056,7 +1071,7 @@ export async function createChildIssue(
 }
 
 export async function setParentIssue(idOrKey: string | number, parentKey: string | null): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/issues/${idOrKey}/parent`, {
+  const res = await authFetch(`${API_BASE}/api/issues/${idOrKey}/parent`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parentIssueKey: parentKey })
@@ -1068,7 +1083,7 @@ export async function setParentIssue(idOrKey: string | number, parentKey: string
 }
 
 export async function fetchIssueLinks(idOrKey: string | number): Promise<IssueLinkItem[]> {
-  const res = await fetch(`${API_BASE}/api/issues/${idOrKey}/links`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/issues/${idOrKey}/links`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
 }
@@ -1077,7 +1092,7 @@ export async function createIssueLink(
   sourceKey: string,
   data: { targetIssueKey: string; relationship: string }
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/issues/${sourceKey}/links`, {
+  const res = await authFetch(`${API_BASE}/api/issues/${sourceKey}/links`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -1089,7 +1104,7 @@ export async function createIssueLink(
 }
 
 export async function deleteIssueLink(linkId: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/issues/links/${linkId}`, {
+  const res = await authFetch(`${API_BASE}/api/issues/links/${linkId}`, {
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Failed to delete issue link');
@@ -1105,7 +1120,7 @@ export async function fetchNotifications(
   if (category && category !== 'all') params.append('category', category);
   if (unreadOnly) params.append('unreadOnly', 'true');
 
-  const res = await fetch(`${API_BASE}/api/notifications?${params.toString()}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/notifications?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     return { notifications: [], totalCount: 0, unreadCount: 0, directCount: 0, watchingCount: 0 };
   }
@@ -1113,25 +1128,81 @@ export async function fetchNotifications(
 }
 
 export async function markNotificationAsRead(id: number): Promise<UserNotification> {
-  const res = await fetch(`${API_BASE}/api/notifications/${id}/read`, { method: 'PUT' });
+  const res = await authFetch(`${API_BASE}/api/notifications/${id}/read`, { method: 'PUT' });
   if (!res.ok) throw new Error('Failed to mark notification as read');
   return res.json();
 }
 
 export async function markAllNotificationsAsRead(userName: string = 'Sajidur Rahman'): Promise<{ success: boolean; updatedCount: number }> {
-  const res = await fetch(`${API_BASE}/api/notifications/read-all?userName=${encodeURIComponent(userName)}`, { method: 'PUT' });
+  const res = await authFetch(`${API_BASE}/api/notifications/read-all?userName=${encodeURIComponent(userName)}`, { method: 'PUT' });
   if (!res.ok) throw new Error('Failed to mark all notifications as read');
   return res.json();
 }
 
 export async function deleteNotification(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/notifications/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/notifications/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete notification');
 }
 
 export async function clearAllNotifications(userName: string = 'Sajidur Rahman'): Promise<{ success: boolean; removedCount: number }> {
-  const res = await fetch(`${API_BASE}/api/notifications/clear-all?userName=${encodeURIComponent(userName)}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/notifications/clear-all?userName=${encodeURIComponent(userName)}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to clear notifications');
   return res.json();
 }
 
+// Administration (requires the Administrator role)
+async function adminRequest<T>(path: string, init: RequestInit = {}, fallbackError = 'Request failed'): Promise<T> {
+  const res = await authFetch(`${API_BASE}/api/admin${path}`, {
+    cache: 'no-store',
+    ...init,
+    headers: init.body ? { 'Content-Type': 'application/json', ...init.headers } : init.headers
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || (res.status === 403 ? 'You need administrator access to do this.' : fallbackError));
+  }
+  return res.status === 204 ? (undefined as T) : res.json();
+}
+
+export function fetchAdminOverview(): Promise<AdminOverview> {
+  return adminRequest('/overview', {}, 'Failed to load admin overview');
+}
+
+export function fetchAdminUsers(): Promise<AdminUser[]> {
+  return adminRequest('/users', {}, 'Failed to load users');
+}
+
+export function adminCreateUser(data: {
+  name?: string;
+  displayName: string;
+  emailAddress: string;
+  role: string;
+  department?: string;
+  jobTitle?: string;
+  password: string;
+}): Promise<AdminUser> {
+  return adminRequest('/users', { method: 'POST', body: JSON.stringify(data) }, 'Failed to create user');
+}
+
+export function adminUpdateUser(
+  id: number,
+  data: Partial<Pick<AdminUser, 'name' | 'displayName' | 'emailAddress' | 'role' | 'department' | 'jobTitle' | 'active'>>
+): Promise<AdminUser> {
+  return adminRequest(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }, 'Failed to update user');
+}
+
+export function adminSetPassword(id: number, password: string): Promise<AdminUser> {
+  return adminRequest(`/users/${id}/password`, { method: 'POST', body: JSON.stringify({ password }) }, 'Failed to set password');
+}
+
+export function adminSignOutUser(id: number): Promise<void> {
+  return adminRequest(`/users/${id}/sign-out`, { method: 'POST' }, 'Failed to sign out user');
+}
+
+export function fetchAdminSessions(): Promise<AdminSession[]> {
+  return adminRequest('/sessions', {}, 'Failed to load sessions');
+}
+
+export function adminRevokeSession(id: number): Promise<void> {
+  return adminRequest(`/sessions/${id}`, { method: 'DELETE' }, 'Failed to revoke session');
+}

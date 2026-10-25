@@ -1,11 +1,19 @@
 using System;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using JiraClone.Api.Auth;
+using JiraClone.Api.Controllers;
 using JiraClone.Api.Data;
+using JiraClone.Api.Models;
 using JiraClone.Api.Services;
 
 // Enable Npgsql legacy timestamp behavior so Unspecified DateTimes do not throw exceptions
@@ -26,6 +34,34 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Add DI Services
 builder.Services.AddScoped<IJiraCompatibilityService, JiraCompatibilityService>();
 builder.Services.AddScoped<IJqlEngineService, JqlEngineService>();
+builder.Services.AddHttpContextAccessor();
+
+// Authentication: session tokens from /api/auth/login (Bearer) or Basic credentials for REST clients
+builder.Services.AddSingleton<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
+builder.Services.AddScoped<CredentialValidator>();
+builder.Services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
+builder.Services.AddAuthorization(options =>
+{
+    // Every endpoint requires a signed-in user unless it is marked [AllowAnonymous]
+    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+});
+
+// Slow down password guessing: login attempts and Basic-auth requests are limited per client IP
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AuthController.LoginRateLimitPolicy, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            "login:" + context.Connection.RemoteIpAddress,
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        context.Request.Headers.Authorization.ToString().StartsWith("Basic ", StringComparison.OrdinalIgnoreCase)
+            ? RateLimitPartition.GetFixedWindowLimiter(
+                "basic:" + context.Connection.RemoteIpAddress,
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) })
+            : RateLimitPartition.GetNoLimiter(string.Empty));
+});
 
 // Add Controllers with JSON serialization configuration
 builder.Services.AddControllers()
@@ -65,6 +101,9 @@ using (var scope = app.Services.CreateScope())
     {
         await DbInitializer.InitializeAsync(db);
         Console.WriteLine("[DB Initializer] PostgreSQL connected and initialized successfully.");
+
+        var credentials = scope.ServiceProvider.GetRequiredService<CredentialValidator>();
+        await AdminSeeder.EnsureAdminAsync(db, credentials, app.Configuration);
     }
     catch (Exception ex)
     {
@@ -84,6 +123,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowFrontend");
 
+app.UseRateLimiter();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

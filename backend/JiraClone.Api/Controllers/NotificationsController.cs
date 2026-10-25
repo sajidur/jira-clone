@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using JiraClone.Api.Auth;
 using JiraClone.Api.Data;
 using JiraClone.Api.Models;
 
@@ -26,7 +27,7 @@ public class NotificationsController : ControllerBase
         [FromQuery] bool? unreadOnly = null,
         [FromQuery] int limit = 50)
     {
-        var targetUser = string.IsNullOrWhiteSpace(userName) ? "Sajidur Rahman" : userName.Trim();
+        var targetUser = string.IsNullOrWhiteSpace(userName) ? User.GetDisplayName() : userName.Trim();
 
         // Find notifications for this user or addressed generally to system
         var baseQuery = _db.UserNotifications
@@ -80,7 +81,7 @@ public class NotificationsController : ControllerBase
     [HttpPut("read-all")]
     public async Task<IActionResult> MarkAllAsRead([FromQuery] string? userName = null)
     {
-        var targetUser = string.IsNullOrWhiteSpace(userName) ? "Sajidur Rahman" : userName.Trim();
+        var targetUser = string.IsNullOrWhiteSpace(userName) ? User.GetDisplayName() : userName.Trim();
 
         var notifications = await _db.UserNotifications
             .Where(n => (n.RecipientName.ToLower() == targetUser.ToLower() || n.Category == "system") && !n.IsRead)
@@ -124,7 +125,7 @@ public class NotificationsController : ControllerBase
     [HttpDelete("clear-all")]
     public async Task<IActionResult> ClearAll([FromQuery] string? userName = null)
     {
-        var targetUser = string.IsNullOrWhiteSpace(userName) ? "Sajidur Rahman" : userName.Trim();
+        var targetUser = string.IsNullOrWhiteSpace(userName) ? User.GetDisplayName() : userName.Trim();
 
         var notifications = await _db.UserNotifications
             .Where(n => n.RecipientName.ToLower() == targetUser.ToLower() || n.Category == "system")

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using JiraClone.Api.Auth;
 using JiraClone.Api.Data;
 using JiraClone.Api.Models;
 
@@ -194,7 +195,7 @@ public class WorkspacesController : ControllerBase
         _db.WorkspaceAuditLogs.Add(new WorkspaceAuditLog
         {
             WorkspaceId = workspace.Id,
-            ActorName = "Sajidur Rahman",
+            ActorName = User.GetDisplayName(),
             ActorEmail = "sajidur@akij.net",
             Action = "WORKSPACE_CREATED",
             Details = $"Workspace '{workspace.Name}' ({workspace.Slug}.atlassian.net) created.",
@@ -224,7 +225,7 @@ public class WorkspacesController : ControllerBase
         _db.WorkspaceAuditLogs.Add(new WorkspaceAuditLog
         {
             WorkspaceId = w.Id,
-            ActorName = "Sajidur Rahman",
+            ActorName = User.GetDisplayName(),
             ActorEmail = "sajidur@akij.net",
             Action = "GENERAL_PROFILE_UPDATED",
             Details = "Workspace general settings and organizational parameters updated.",
@@ -251,7 +252,7 @@ public class WorkspacesController : ControllerBase
         _db.WorkspaceAuditLogs.Add(new WorkspaceAuditLog
         {
             WorkspaceId = w.Id,
-            ActorName = "Sajidur Rahman",
+            ActorName = User.GetDisplayName(),
             ActorEmail = "sajidur@akij.net",
             Action = "SECURITY_POLICIES_UPDATED",
             Details = $"Security governance updated: 2FA={dto.RequireTwoFactor}, SSO={dto.EnforceSso}, Domains={dto.AllowedDomainRestrictions}.",
@@ -280,7 +281,7 @@ public class WorkspacesController : ControllerBase
         _db.WorkspaceAuditLogs.Add(new WorkspaceAuditLog
         {
             WorkspaceId = w.Id,
-            ActorName = "Sajidur Rahman",
+            ActorName = User.GetDisplayName(),
             ActorEmail = "sajidur@akij.net",
             Action = "FEATURE_FLAGS_UPDATED",
             Details = "Workspace feature modules and capabilities updated.",
@@ -354,7 +355,7 @@ public class WorkspacesController : ControllerBase
         _db.WorkspaceAuditLogs.Add(new WorkspaceAuditLog
         {
             WorkspaceId = id,
-            ActorName = "Sajidur Rahman",
+            ActorName = User.GetDisplayName(),
             ActorEmail = "sajidur@akij.net",
             Action = "MEMBER_ADDED",
             Details = $"User ID {dto.UserId} added with role {dto.Role}.",

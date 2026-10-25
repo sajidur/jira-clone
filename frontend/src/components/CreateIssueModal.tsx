@@ -11,6 +11,7 @@ import {
   ProjectVersion
 } from '@/types/jira';
 import { IssueTypeIcon, PriorityIcon, Icons } from './Icons';
+import { useCurrentUser } from './AuthProvider';
 import {
   createIssue,
   fetchCustomFields,
@@ -50,7 +51,8 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   const [priority, setPriority] = useState('Medium');
   const [status, setStatus] = useState(defaultStatus);
   const [assigneeName, setAssigneeName] = useState('');
-  const [reporterName, setReporterName] = useState(users[0]?.displayName || 'Sajidur Rahman');
+  const signedInUser = useCurrentUser();
+  const [reporterName, setReporterName] = useState(signedInUser.displayName);
   const [storyPoints, setStoryPoints] = useState<number | undefined>(undefined);
   const [sprintId, setSprintId] = useState<number | undefined>(
     defaultSprintId !== undefined ? (defaultSprintId ?? undefined) : undefined
@@ -83,7 +85,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
 
   // Selected project object
   const activeProj = projects.find((p) => p.id === projectId) || currentProject;
-  const currentUser = users.find((u) => u.displayName === 'Sajidur Rahman') || users[0];
+  const currentUser = users.find((u) => u.id === signedInUser.id) || signedInUser;
 
   // Load project-specific metadata (Workflow, Sprints, Components, Releases, Admin Custom Fields)
   useEffect(() => {

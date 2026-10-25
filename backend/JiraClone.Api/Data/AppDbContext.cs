@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<Worklog> Worklogs => Set<Worklog>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<ProjectVersion> ProjectVersions => Set<ProjectVersion>();
     public DbSet<ProjectWorkflowStatus> ProjectWorkflowStatuses => Set<ProjectWorkflowStatus>();
     public DbSet<CustomFieldDefinition> CustomFieldDefinitions => Set<CustomFieldDefinition>();
@@ -268,6 +269,15 @@ public class AppDbContext : DbContext
             entity.ToTable("app_users");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.AccountId).IsUnique();
+        });
+
+        modelBuilder.Entity<UserSession>(entity =>
+        {
+            entity.ToTable("user_sessions");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.Property(e => e.TokenHash).HasMaxLength(64).IsRequired();
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Workspace>(entity =>

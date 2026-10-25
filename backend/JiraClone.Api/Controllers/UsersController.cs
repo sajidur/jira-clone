@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using JiraClone.Api.Auth;
 using JiraClone.Api.Data;
 using JiraClone.Api.Models;
 
@@ -96,6 +98,7 @@ public class UsersController : ControllerBase
         return Ok(user);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole)]
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
     {
@@ -136,11 +139,15 @@ public class UsersController : ControllerBase
         return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto dto)
     {
         var user = await _db.AppUsers.FindAsync(id);
         if (user == null) return NotFound();
+
+        var accessError = await AdminGuard.CheckAccessChangeAsync(_db, User, user, dto.Role, dto.Active);
+        if (accessError != null) return BadRequest(new { message = accessError });
 
         if (!string.IsNullOrWhiteSpace(dto.DisplayName)) user.DisplayName = dto.DisplayName.Trim();
         if (!string.IsNullOrWhiteSpace(dto.EmailAddress)) user.EmailAddress = dto.EmailAddress.Trim();
@@ -157,11 +164,15 @@ public class UsersController : ControllerBase
         return Ok(user);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteUser(int id)
     {
         var user = await _db.AppUsers.FindAsync(id);
         if (user == null) return NotFound();
+
+        var accessError = await AdminGuard.CheckAccessChangeAsync(_db, User, user, null, false);
+        if (accessError != null) return BadRequest(new { message = accessError });
 
         user.Active = false; // Soft deactivate
         await _db.SaveChangesAsync();
@@ -194,6 +205,7 @@ public class UsersController : ControllerBase
         return Ok(groups);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole)]
     [HttpPost("groups")]
     public async Task<IActionResult> CreateGroup([FromBody] CreateGroupDto dto)
     {
@@ -214,6 +226,7 @@ public class UsersController : ControllerBase
         return Ok(group);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole)]
     [HttpDelete("groups/{id:int}")]
     public async Task<IActionResult> DeleteGroup(int id)
     {
@@ -235,6 +248,7 @@ public class UsersController : ControllerBase
         return Ok(teams);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole + ",Project Lead")]
     [HttpPost("teams")]
     public async Task<IActionResult> CreateTeam([FromBody] CreateTeamDto dto)
     {
@@ -257,6 +271,7 @@ public class UsersController : ControllerBase
         return Ok(team);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole + ",Project Lead")]
     [HttpDelete("teams/{id:int}")]
     public async Task<IActionResult> DeleteTeam(int id)
     {
@@ -278,6 +293,7 @@ public class UsersController : ControllerBase
         return Ok(settings);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole)]
     [HttpPost("app-access/toggle/{id:int}")]
     public async Task<IActionResult> ToggleAppAccess(int id)
     {
@@ -288,6 +304,7 @@ public class UsersController : ControllerBase
         return Ok(setting);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole)]
     [HttpPut("app-access/{id:int}")]
     public async Task<IActionResult> UpdateAppAccess(int id, [FromBody] JsonElement body)
     {
@@ -318,6 +335,7 @@ public class UsersController : ControllerBase
         return Ok(members);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole + ",Project Lead")]
     [HttpPost("project-members")]
     public async Task<IActionResult> AddProjectMember([FromBody] AddProjectMemberDto dto)
     {
@@ -345,6 +363,7 @@ public class UsersController : ControllerBase
         return Ok(loaded);
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole + ",Project Lead")]
     [HttpDelete("project-members/{id:int}")]
     public async Task<IActionResult> RemoveProjectMember(int id)
     {
@@ -404,6 +423,7 @@ public class UsersController : ControllerBase
         });
     }
 
+    [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole)]
     [HttpPost("permissions/toggle")]
     public async Task<IActionResult> ToggleProjectPermission([FromBody] TogglePermissionDto dto)
     {

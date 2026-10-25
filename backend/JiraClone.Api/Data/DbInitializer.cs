@@ -14,6 +14,25 @@ public static class DbInitializer
         // Ensure database tables exist
         await context.Database.EnsureCreatedAsync();
 
+        // Authentication: password hashes, last login, and sign-in sessions
+        await context.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE app_users ADD COLUMN IF NOT EXISTS ""PasswordHash"" text;
+            ALTER TABLE app_users ADD COLUMN IF NOT EXISTS ""LastLoginAt"" timestamp without time zone;
+
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                ""Id"" serial PRIMARY KEY,
+                ""UserId"" integer NOT NULL REFERENCES app_users(""Id"") ON DELETE CASCADE,
+                ""TokenHash"" character varying(64) NOT NULL,
+                ""CreatedAt"" timestamp without time zone NOT NULL,
+                ""LastSeenAt"" timestamp without time zone NOT NULL,
+                ""ExpiresAt"" timestamp without time zone NOT NULL,
+                ""IpAddress"" text NULL,
+                ""UserAgent"" text NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_user_sessions_TokenHash"" ON user_sessions (""TokenHash"");
+            CREATE INDEX IF NOT EXISTS ""IX_user_sessions_UserId"" ON user_sessions (""UserId"");
+        ");
+
         // Add any missing columns and tables safely
         try
         {

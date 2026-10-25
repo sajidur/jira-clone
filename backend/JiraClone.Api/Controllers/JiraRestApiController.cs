@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using JiraClone.Api.Auth;
 using JiraClone.Api.Data;
 using JiraClone.Api.DTOs;
 using JiraClone.Api.Services;
@@ -46,19 +47,23 @@ public class JiraRestApiController : ControllerBase
     }
 
     [HttpGet("myself")]
-    public IActionResult GetMyself()
+    public async Task<IActionResult> GetMyself()
     {
+        var user = await _db.AppUsers.FindAsync(User.GetUserId());
+        if (user == null) return Unauthorized();
+
+        var groups = JsonSerializer.Deserialize<string[]>(user.GroupsJson) ?? Array.Empty<string>();
         return Ok(new
         {
-            self = $"{Request.Scheme}://{Request.Host}/rest/api/2/user?username=admin",
-            name = "admin",
-            key = "admin",
-            accountId = "usr-admin",
-            emailAddress = "admin@example.com",
-            displayName = "Administrator",
-            active = true,
-            timeZone = "UTC",
-            groups = new { size = 1, items = new[] { new { name = "jira-administrators" } } }
+            self = $"{Request.Scheme}://{Request.Host}/rest/api/2/user?username={Uri.EscapeDataString(user.Name)}",
+            name = user.Name,
+            key = user.Name,
+            accountId = user.AccountId,
+            emailAddress = user.EmailAddress,
+            displayName = user.DisplayName,
+            active = user.Active,
+            timeZone = user.TimeZone ?? "UTC",
+            groups = new { size = groups.Length, items = groups.Select(g => new { name = g }) }
         });
     }
 

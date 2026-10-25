@@ -12,6 +12,7 @@ import {
   updateProject
 } from '@/lib/api';
 import { SpaceAvatar } from './SpaceAvatar';
+import { useCurrentUser } from './AuthProvider';
 
 interface BoardViewProps {
   project: Project;
@@ -42,6 +43,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   onNavigateView,
   onProjectUpdated
 }) => {
+  const currentUser = useCurrentUser();
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [filterType, setFilterType] = useState<string>('all');
@@ -186,7 +188,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
       return false;
     }
     if (filterAssignee === 'me') {
-      if (!issue.assigneeName?.toLowerCase().includes('sajidur') && !issue.assigneeName?.toLowerCase().includes('alex')) return false;
+      if (issue.assigneeName !== currentUser.displayName) return false;
     } else if (filterAssignee === 'unassigned') {
       if (issue.assigneeName) return false;
     } else if (filterAssignee !== 'all') {
@@ -197,11 +199,13 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
   const handleDragStart = (e: React.DragEvent, id: number) => {
     e.dataTransfer.setData('text/plain', id.toString());
+    e.dataTransfer.effectAllowed = 'move';
     setDraggedIssueId(id);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
@@ -667,6 +671,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                             key={issue.id}
                             draggable
                             onDragStart={(e) => handleDragStart(e, issue.id)}
+                            onDragEnd={() => setDraggedIssueId(null)}
                             onClick={() => onSelectIssue(issue)}
                             className={`bg-white p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:shadow-sm transition cursor-pointer select-none relative group ${
                               draggedIssueId === issue.id ? 'opacity-30' : ''
