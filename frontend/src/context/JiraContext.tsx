@@ -14,6 +14,14 @@ import {
   completeSprint,
   fetchIssue
 } from '@/lib/api';
+import { parseRoute } from '@/lib/routes';
+
+// The space named in the current URL, if any (e.g. /jira/software/projects/ERP/... or /browse/ERP-12)
+function projectKeyFromUrl(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const route = parseRoute(window.location.pathname);
+  return route.kind === 'view' || route.kind === 'browse' ? route.projectKey : undefined;
+}
 
 interface JiraContextValue {
   // Data
@@ -23,6 +31,8 @@ interface JiraContextValue {
   selectProjectByKey: (key: string) => Project | null;
   sprints: Sprint[];
   issues: Issue[];
+  /** True once sprints and issues have been loaded for the selected project. */
+  projectDataReady: boolean;
   users: AppUser[];
   workspaces: Workspace[];
   selectedWorkspace: Workspace | null;
@@ -96,6 +106,7 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loadedProjectId, setLoadedProjectId] = useState<number | null>(null);
 
   // Modals
   const [selectedIssueId, setSelectedIssueId] = useState<number | null>(null);
@@ -134,10 +145,12 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUsers(userData);
       setWorkspaces(wsData);
 
-      let activeWs = wsData[0] || null;
+      const urlProject = projData.find((p) => p.key.toUpperCase() === projectKeyFromUrl());
+
+      let activeWs = (urlProject && wsData.find((w) => w.id === urlProject.workspaceId)) || wsData[0] || null;
       if (typeof window !== 'undefined') {
         const storedWsId = localStorage.getItem('jira_selected_workspace_id');
-        if (storedWsId) {
+        if (storedWsId && !urlProject) {
           const match = wsData.find((w) => w.id === Number(storedWsId));
           if (match) activeWs = match;
         }
@@ -148,8 +161,8 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? projData.filter((p) => !p.workspaceId || p.workspaceId === activeWs.id)
         : projData;
 
-      let targetProject = scopedProj[0] || projData[0] || null;
-      if (typeof window !== 'undefined') {
+      let targetProject = urlProject || scopedProj[0] || projData[0] || null;
+      if (typeof window !== 'undefined' && !urlProject) {
         const storedProjKey = localStorage.getItem('jira_selected_project_key');
         if (storedProjKey) {
           const match = projData.find((p) => p.key.toLowerCase() === storedProjKey.toLowerCase());
@@ -176,6 +189,7 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ]);
       setSprints(sprintData);
       setIssues(issueData);
+      setLoadedProjectId(selectedProject.id);
     } catch (err) {
       console.error('Failed to load project details', err);
     }
@@ -194,13 +208,17 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const match = projects.find((p) => p.key.toLowerCase() === key.toLowerCase());
     if (match) {
       setSelectedProject(match);
+      // Opening a space from another workspace switches to that workspace
+      const ws = match.workspaceId ? workspaces.find((w) => w.id === match.workspaceId) : undefined;
+      if (ws) setSelectedWorkspace((prev) => (prev?.id === ws.id ? prev : ws));
       if (typeof window !== 'undefined') {
         localStorage.setItem('jira_selected_project_key', match.key);
+        if (ws) localStorage.setItem('jira_selected_workspace_id', ws.id.toString());
       }
       return match;
     }
     return null;
-  }, [projects]);
+  }, [projects, workspaces]);
 
   const handleWorkspaceSelect = useCallback((ws: Workspace) => {
     setSelectedWorkspace(ws);
@@ -349,6 +367,7 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
         selectProjectByKey,
         sprints,
         issues,
+        projectDataReady: !!selectedProject && loadedProjectId === selectedProject.id,
         users,
         workspaces,
         selectedWorkspace,

@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Project, Issue, Sprint, ProjectVersion } from '@/types/jira';
 import { IssueTypeIcon, PriorityIcon, Icons } from './Icons';
-import { SpaceAvatar } from './SpaceAvatar';
-import { createIssue, fetchVersions, updateIssue, updateSprint, deleteSprint, completeSprint, updateProject } from '@/lib/api';
+import { createIssue, fetchVersions, updateIssue, updateSprint, deleteSprint, completeSprint } from '@/lib/api';
 
 interface BacklogViewProps {
   project: Project;
@@ -33,40 +32,6 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
   onRefresh,
   onProjectUpdated
 }) => {
-  // On-the-fly space name editing
-  const [isEditingSpaceName, setIsEditingSpaceName] = useState(false);
-  const [tempSpaceName, setTempSpaceName] = useState(project.name);
-  const [savingSpaceName, setSavingSpaceName] = useState(false);
-
-  useEffect(() => {
-    setTempSpaceName(project.name);
-  }, [project.name]);
-
-  const handleSaveSpaceName = async () => {
-    if (!tempSpaceName.trim() || tempSpaceName.trim() === project.name) {
-      setIsEditingSpaceName(false);
-      setTempSpaceName(project.name);
-      return;
-    }
-    try {
-      setSavingSpaceName(true);
-      const updated = await updateProject(project.id, { name: tempSpaceName.trim() });
-      if (onProjectUpdated) onProjectUpdated(updated);
-      setIsEditingSpaceName(false);
-    } catch (err) {
-      console.error('Failed to update space name', err);
-      alert('Failed to save space name');
-      setTempSpaceName(project.name);
-      setIsEditingSpaceName(false);
-    } finally {
-      setSavingSpaceName(false);
-    }
-  };
-
-  const handleCancelSpaceName = () => {
-    setTempSpaceName(project.name);
-    setIsEditingSpaceName(false);
-  };
   // Modal states
   const [showNewSprintModal, setShowNewSprintModal] = useState(false);
   const [newSprintName, setNewSprintName] = useState(`Sprint ${sprints.length + 1}`);
@@ -423,56 +388,6 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
       <main className="flex-1 flex flex-col overflow-y-auto bg-white p-6">
         {/* Top Header */}
         <div className="pb-4 border-b border-[#EBECF0] shrink-0">
-          <div className="flex items-center gap-1.5 text-xs text-[#5E6C84] mb-1">
-            <span>Spaces</span>
-            <span>/</span>
-            {isEditingSpaceName ? (
-              <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="text"
-                  autoFocus
-                  disabled={savingSpaceName}
-                  value={tempSpaceName}
-                  onChange={(e) => setTempSpaceName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveSpaceName();
-                    if (e.key === 'Escape') handleCancelSpaceName();
-                  }}
-                  className="text-xs font-semibold text-[#172B4D] px-1.5 py-0.5 border border-[#0052cc] rounded-sm bg-white focus:outline-hidden"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveSpaceName}
-                  disabled={savingSpaceName}
-                  className="p-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer transition"
-                  title="Save (Enter)"
-                >
-                  <Icons.Check className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelSpaceName}
-                  disabled={savingSpaceName}
-                  className="p-0.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 cursor-pointer transition"
-                  title="Cancel (Esc)"
-                >
-                  <Icons.X className="w-3 h-3" />
-                </button>
-              </span>
-            ) : (
-              <span
-                onClick={() => setIsEditingSpaceName(true)}
-                className="group inline-flex items-center gap-1.5 hover:text-[#172B4D] hover:bg-slate-100 px-1 py-0.5 rounded cursor-pointer transition"
-                title="Click to edit space name"
-              >
-                <SpaceAvatar project={project} size="xs" />
-                <span className="hover:underline font-medium">{project.name}</span>
-                <Icons.Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </span>
-            )}
-            <span>/</span>
-            <span className="text-[#172B4D] font-semibold">Backlog</span>
-          </div>
 
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-[#172B4D] tracking-tight">

@@ -662,16 +662,11 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({ project, o
   };
 
   return (
-    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 h-[calc(100vh-3.5rem)] p-4 sm:p-6 select-none">
+    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 min-h-0 p-4 sm:p-6 select-none">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-              <span>{project.name} ({project.key})</span>
-              <span>/</span>
-              <span className="font-semibold text-slate-700">Project Settings</span>
-            </div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
               <Icons.Sliders className="w-6 h-6 text-[#0052cc]" />
               Workflow Studio & Dynamic Customization

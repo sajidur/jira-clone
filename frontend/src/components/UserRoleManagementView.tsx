@@ -395,7 +395,7 @@ export default function UserRoleManagementView({ currentProject }: UserRoleManag
   const permissionCategories = Array.from(new Set(permissionDefs.map(d => d.category)));
 
   return (
-    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 h-[calc(100vh-3.5rem)] p-4 sm:p-6 select-none">
+    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 min-h-0 p-4 sm:p-6 select-none">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">

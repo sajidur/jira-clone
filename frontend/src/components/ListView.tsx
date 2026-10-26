@@ -175,20 +175,10 @@ export const ListView: React.FC<ListViewProps> = ({
   const grouped = getGroupedIssues();
 
   return (
-    <div className="flex-1 min-w-0 w-full flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-white p-4 sm:p-6">
+    <div className="flex-1 min-w-0 w-full flex flex-col min-h-0 overflow-hidden bg-white p-4 sm:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3">
         <div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-            <span>Spaces</span>
-            <span>/</span>
-            <div className="flex items-center gap-1 font-medium text-slate-700">
-              <SpaceAvatar project={project} size="xs" />
-              <span>{project.name}</span>
-            </div>
-            <span>/</span>
-            <span className="font-semibold text-slate-900">List</span>
-          </div>
           <h1 className="text-2xl font-bold text-[#172B4D] tracking-tight flex items-center gap-2">
             <span>List</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">

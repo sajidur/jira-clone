@@ -27,15 +27,10 @@ export const RoadmapTimelineView: React.FC<RoadmapTimelineViewProps> = ({
   ];
 
   return (
-    <div className="flex-1 min-w-0 w-full flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-white p-4 sm:p-6">
+    <div className="flex-1 min-w-0 w-full flex flex-col min-h-0 overflow-hidden bg-white p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <span>{project.name}</span>
-            <span>/</span>
-            <span className="font-semibold text-slate-700">Roadmap & Timeline</span>
-          </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <span>Roadmap & Gantt Schedule</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 font-bold uppercase">

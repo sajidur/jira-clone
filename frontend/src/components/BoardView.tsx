@@ -8,8 +8,7 @@ import {
   createWorkflowStatus,
   updateWorkflowStatus,
   deleteWorkflowStatus,
-  fetchUsers,
-  updateProject
+  fetchUsers
 } from '@/lib/api';
 import { SpaceAvatar } from './SpaceAvatar';
 import { useCurrentUser } from './AuthProvider';
@@ -51,41 +50,6 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const [groupBy, setGroupBy] = useState<GroupByOption>('none');
   const [draggedIssueId, setDraggedIssueId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // On-the-fly space name editing
-  const [isEditingSpaceName, setIsEditingSpaceName] = useState(false);
-  const [tempSpaceName, setTempSpaceName] = useState(project.name);
-  const [savingSpaceName, setSavingSpaceName] = useState(false);
-
-  useEffect(() => {
-    setTempSpaceName(project.name);
-  }, [project.name]);
-
-  const handleSaveSpaceName = async () => {
-    if (!tempSpaceName.trim() || tempSpaceName.trim() === project.name) {
-      setIsEditingSpaceName(false);
-      setTempSpaceName(project.name);
-      return;
-    }
-    try {
-      setSavingSpaceName(true);
-      const updated = await updateProject(project.id, { name: tempSpaceName.trim() });
-      if (onProjectUpdated) onProjectUpdated(updated);
-      setIsEditingSpaceName(false);
-    } catch (err) {
-      console.error('Failed to update space name on the fly', err);
-      alert('Failed to save space name');
-      setTempSpaceName(project.name);
-      setIsEditingSpaceName(false);
-    } finally {
-      setSavingSpaceName(false);
-    }
-  };
-
-  const handleCancelSpaceName = () => {
-    setTempSpaceName(project.name);
-    setIsEditingSpaceName(false);
-  };
 
   // Complete sprint modal
   const [completingSprint, setCompletingSprint] = useState<Sprint | null>(null);
@@ -265,167 +229,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const swimlanes = getSwimlaneGroups();
 
   return (
-    <div className="flex-1 min-w-0 w-full flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-white select-none font-sans">
-      {/* ------------------------------------------------------------- */}
-      {/* 1. TOP SPACE HEADER (MATCHING JIRA AiPRO BREADCRUMB & TITLE) */}
-      {/* ------------------------------------------------------------- */}
-      <div className="px-6 pt-3 pb-0 border-b border-[#EBECF0] bg-white">
-        <div className="text-[11px] text-slate-500 font-medium mb-1 flex items-center gap-1">
-          <span>Spaces</span>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              onClick={() => onNavigateView?.('config')}
-              className="cursor-pointer hover:opacity-90 transition"
-              title="Space Logo / Settings"
-            >
-              <SpaceAvatar project={project} size="sm" />
-            </div>
-            {isEditingSpaceName ? (
-              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="text"
-                  autoFocus
-                  disabled={savingSpaceName}
-                  value={tempSpaceName}
-                  onChange={(e) => setTempSpaceName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveSpaceName();
-                    if (e.key === 'Escape') handleCancelSpaceName();
-                  }}
-                  className="text-xl font-bold text-[#172B4D] px-2 py-0.5 border-2 border-[#0052cc] rounded-sm bg-white shadow-inner focus:outline-hidden"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveSpaceName}
-                  disabled={savingSpaceName}
-                  className="p-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer transition"
-                  title="Save (Enter)"
-                >
-                  <Icons.Check className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelSpaceName}
-                  disabled={savingSpaceName}
-                  className="p-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 cursor-pointer transition"
-                  title="Cancel (Esc)"
-                >
-                  <Icons.X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <h1
-                onClick={() => setIsEditingSpaceName(true)}
-                className="text-xl font-bold text-[#172B4D] tracking-tight flex items-center gap-1.5 group cursor-pointer hover:bg-slate-100 hover:ring-1 hover:ring-slate-300 rounded px-1.5 py-0.5 -mx-1.5 transition"
-                title="Click to edit space name"
-              >
-                <span>{project.name}</span>
-                <Icons.Edit className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </h1>
-            )}
-            <div className="flex items-center gap-1 text-slate-500 pl-1">
-              <button
-                onClick={() => onNavigateView?.('users')}
-                className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition cursor-pointer"
-                title="Space Members"
-              >
-                <Icons.Users className="w-3.5 h-3.5" />
-              </button>
-              <button className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 cursor-pointer">
-                <span className="font-bold text-xs leading-none">•••</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 text-slate-500">
-            <button className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition" title="Share">
-              <Icons.ExternalLink className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => onNavigateView?.('config')}
-              className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition"
-              title="Automations"
-            >
-              <Icons.Cpu className="w-3.5 h-3.5" />
-            </button>
-            <button className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition" title="Feedback">
-              <Icons.MessageSquare className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* ------------------------------------------------------------- */}
-        {/* 2. SUB-NAVIGATION TABS (Summary, Backlog, Board, Timeline, Docs, Forms, Development) */}
-        {/* ------------------------------------------------------------- */}
-        <div className="flex items-center gap-1 mt-2.5 -mb-px overflow-x-auto text-xs font-semibold">
-          <button
-            onClick={() => onNavigateView?.('reports')}
-            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition cursor-pointer"
-          >
-            <Icons.Compass className="w-3.5 h-3.5 text-slate-500" />
-            <span>Summary</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateView?.('backlog')}
-            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition cursor-pointer"
-          >
-            <Icons.Backlog className="w-3.5 h-3.5 text-slate-500" />
-            <span>Backlog</span>
-          </button>
-
-          <button
-            className="flex items-center gap-1.5 px-3 py-2 text-[#0052cc] border-b-2 border-[#0052cc] font-bold transition cursor-pointer"
-          >
-            <Icons.Kanban className="w-3.5 h-3.5 text-[#0052cc]" />
-            <span>Board</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateView?.('roadmap')}
-            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition cursor-pointer"
-          >
-            <Icons.Clock className="w-3.5 h-3.5 text-slate-500" />
-            <span>Timeline</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateView?.('config')}
-            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition cursor-pointer"
-          >
-            <Icons.FileText className="w-3.5 h-3.5 text-slate-500" />
-            <span>Docs</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateView?.('config')}
-            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition cursor-pointer"
-          >
-            <Icons.List className="w-3.5 h-3.5 text-slate-500" />
-            <span>Forms</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateView?.('releases')}
-            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition cursor-pointer"
-          >
-            <Icons.Code className="w-3.5 h-3.5 text-slate-500" />
-            <span>Development</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateView?.('config')}
-            className="p-2 text-slate-400 hover:text-slate-800 transition"
-            title="Add view"
-          >
-            <Icons.Plus className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
+    <div className="flex-1 min-w-0 min-h-0 w-full flex flex-col overflow-hidden bg-white select-none font-sans">
       {/* ------------------------------------------------------------- */}
       {/* 3. JIRA BOARD TOOLBAR (FILTER, SEARCH, GROUP, COMPLETE SPRINT) */}
       {/* ------------------------------------------------------------- */}

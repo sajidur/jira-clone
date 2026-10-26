@@ -20,8 +20,8 @@ import { Icons } from './Icons';
 import { Dialog, Lozenge, fieldClass } from './AdminUi';
 import AdminEmailSettings from './AdminEmailSettings';
 import type { ViewType } from './Navbar';
+import type { AdminSection } from '@/lib/routes';
 
-type AdminSection = 'overview' | 'users' | 'sessions' | 'email';
 type StatusFilter = 'all' | 'active' | 'deactivated' | 'no-password';
 
 const ADMIN_ROLE = 'Administrator';
@@ -30,6 +30,9 @@ const MIN_PASSWORD_LENGTH = 8;
 
 interface AdminConsoleViewProps {
   onNavigateView: (view: ViewType) => void;
+  /** Controlled section (from the URL); falls back to internal state when omitted. */
+  section?: AdminSection;
+  onSectionChange?: (section: AdminSection) => void;
 }
 
 // Timestamps without a zone designator come from UTC columns
@@ -104,11 +107,13 @@ const UserAvatar: React.FC<{ name: string; url?: string; className?: string }> =
     </div>
   );
 
-export default function AdminConsoleView({ onNavigateView }: AdminConsoleViewProps) {
+export default function AdminConsoleView({ onNavigateView, section: sectionProp, onSectionChange }: AdminConsoleViewProps) {
   const me = useCurrentUser();
   const { refreshUser } = useAuth();
 
-  const [section, setSection] = useState<AdminSection>('overview');
+  const [localSection, setLocalSection] = useState<AdminSection>('overview');
+  const section = sectionProp ?? localSection;
+  const setSection = onSectionChange ?? setLocalSection;
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [sessions, setSessions] = useState<AdminSession[]>([]);

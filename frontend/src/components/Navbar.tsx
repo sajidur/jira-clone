@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Project, Workspace, UserNotification } from '@/types/jira';
+import Link from 'next/link';
+import { Workspace, UserNotification } from '@/types/jira';
 import { Icons } from './Icons';
-import { SpaceAvatar } from './SpaceAvatar';
 import { NotificationsPopover } from './NotificationsPopover';
 import { useAuth, useCurrentUser, getInitials } from './AuthProvider';
 import {
@@ -31,18 +31,12 @@ export type ViewType =
   | 'admin';
 
 interface NavbarProps {
-  projects: Project[];
-  selectedProject: Project | null;
-  onSelectProject: (p: Project) => void;
   workspaces?: Workspace[];
   selectedWorkspace?: Workspace | null;
   onSelectWorkspace?: (ws: Workspace) => void;
   onOpenCreateWorkspace?: () => void;
   onOpenCreateIssue: () => void;
-  onOpenCreateProject: () => void;
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
-  activeView: ViewType;
+  activeView: ViewType | null;
   setActiveView: (view: ViewType) => void;
   onOpenCommandPalette: () => void;
   onToggleMobileSidebar?: () => void;
@@ -52,17 +46,11 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  projects,
-  selectedProject,
-  onSelectProject,
   workspaces = [],
   selectedWorkspace = null,
   onSelectWorkspace,
   onOpenCreateWorkspace,
   onOpenCreateIssue,
-  onOpenCreateProject,
-  searchQuery,
-  onSearchChange,
   activeView,
   setActiveView,
   onOpenCommandPalette,
@@ -74,7 +62,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   const currentUser = useCurrentUser();
   const { isAdmin, signOut } = useAuth();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [projectFilterText, setProjectFilterText] = useState('');
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [directCount, setDirectCount] = useState(0);
@@ -158,15 +145,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const workspaceProjects = selectedWorkspace
-    ? projects.filter(p => !p.workspaceId || p.workspaceId === selectedWorkspace.id)
-    : projects;
-
-  const filteredProjects = workspaceProjects.filter(p =>
-    p.name.toLowerCase().includes(projectFilterText.toLowerCase()) ||
-    p.key.toLowerCase().includes(projectFilterText.toLowerCase())
-  );
-
   return (
     <header
       ref={navRef}
@@ -175,7 +153,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* ------------------------------------------------------------- */}
       {/* LEFT SECTION: App Switcher + Jira Logo + Menus + Create */}
       {/* ------------------------------------------------------------- */}
-      <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1 overflow-hidden mr-2">
+      <div className="flex items-center gap-1.5 md:gap-2 min-w-0 shrink-0">
         {/* Atlassian App Switcher (9 dots) */}
         <div className="relative">
           <button
@@ -249,16 +227,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         {/* Jira Brand Mark */}
-        <div
-          onClick={() => setActiveView('board')}
-          className="flex items-center gap-2 px-2 py-1.5 hover:bg-[#EBECF0] rounded-md cursor-pointer transition mr-1"
-          title="Go to Kanban Board"
+        <Link
+          href="/jira/for-you"
+          className="flex items-center gap-2 px-2 py-1.5 hover:bg-[#EBECF0] rounded-md transition mr-1"
+          title="Go to your Jira home"
         >
           <Icons.JiraLogo className="w-5 h-5 shrink-0" />
           <span className="font-bold text-[#172B4D] text-[15px] tracking-tight hidden sm:inline">
             Jira
           </span>
-        </div>
+        </Link>
 
         {/* Modern Workspace Switcher */}
         {selectedWorkspace && (
@@ -275,7 +253,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="w-5 h-5 rounded bg-[#0052cc] text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
                 {selectedWorkspace.slug.slice(0, 2).toUpperCase()}
               </div>
-              <span className="font-bold text-slate-800 truncate max-w-[100px] sm:max-w-[140px] md:max-w-[180px] inline">
+              <span className="font-bold text-slate-800 truncate max-w-[140px] md:max-w-[180px] hidden sm:inline">
                 {selectedWorkspace.name}
               </span>
               <Icons.ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
@@ -359,315 +337,30 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         )}
 
-        {/* Main Menus */}
-        <nav className="hidden xl:flex items-center gap-0.5 text-xs font-medium text-[#42526E] shrink-0">
-          {/* Your Work */}
-          <div className="relative">
-            <button
-              onClick={() => toggleDropdown('your-work')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-md hover:bg-[#EBECF0] hover:text-[#172B4D] transition cursor-pointer ${
-                openDropdown === 'your-work' ? 'bg-[#EBECF0] text-[#172B4D] font-bold' : ''
-              }`}
-            >
-              <span>Your work</span>
-              <Icons.ChevronDown className="w-3 h-3 opacity-60" />
-            </button>
+      </div>
 
-            {openDropdown === 'your-work' && (
-              <div className="absolute left-0 top-full mt-1.5 w-60 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs">
-                <div className="px-3 py-1 font-bold text-slate-400 uppercase text-[10px]">Recent Activity</div>
-                <div
-                  onClick={() => { setActiveView('search'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2.5"
-                >
-                  <Icons.Clock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Worked on recently</span>
-                </div>
-                <div
-                  onClick={() => { setActiveView('search'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2.5"
-                >
-                  <Icons.User className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Assigned to me</span>
-                </div>
-                <div
-                  onClick={() => { setActiveView('search'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2.5"
-                >
-                  <Icons.Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                  <span>Starred issues & filters</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Projects Menu */}
-          <div className="relative">
-            <button
-              onClick={() => toggleDropdown('projects')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-[#EBECF0] hover:text-[#172B4D] transition cursor-pointer ${
-                openDropdown === 'projects' ? 'bg-[#EBECF0] text-[#172B4D] font-bold' : ''
-              }`}
-            >
-              {selectedProject && <SpaceAvatar project={selectedProject} size="xs" />}
-              <span className="font-semibold text-slate-900 truncate max-w-[130px]">
-                {selectedProject ? selectedProject.name : 'Projects'}
-              </span>
-              <Icons.ChevronDown className="w-3 h-3 opacity-60" />
-            </button>
-
-            {openDropdown === 'projects' && (
-              <div className="absolute left-0 top-full mt-1.5 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 text-xs">
-                <div className="px-3 pt-1 pb-2">
-                  <input
-                    type="text"
-                    placeholder="Search projects..."
-                    value={projectFilterText}
-                    onChange={(e) => setProjectFilterText(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#0052cc]"
-                    autoFocus
-                  />
-                </div>
-
-                <div className="px-3 py-1 font-bold text-slate-400 uppercase text-[10px]">
-                  Recent Projects ({filteredProjects.length})
-                </div>
-
-                <div className="max-h-56 overflow-y-auto">
-                  {filteredProjects.map((p) => {
-                    const isSelected = selectedProject?.id === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          onSelectProject(p);
-                          setOpenDropdown(null);
-                        }}
-                        className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer ${
-                          isSelected ? 'bg-blue-50/80 text-[#0052cc] font-bold' : 'text-slate-800'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 truncate">
-                          <SpaceAvatar project={p} size="sm" />
-                          <div className="truncate">
-                            <div className="truncate text-xs font-semibold">{p.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{p.key} • Software project</div>
-                          </div>
-                        </div>
-                        {isSelected && <Icons.Check className="w-4 h-4 text-[#0052cc] shrink-0" />}
-                      </button>
-                    );
-                  })}
-                  {filteredProjects.length === 0 && (
-                    <div className="px-3 py-3 text-center text-slate-400 italic">No projects found.</div>
-                  )}
-                </div>
-
-                <div className="border-t border-slate-100 mt-2 pt-1 px-1 space-y-0.5">
-                  <button
-                    onClick={() => {
-                      setActiveView('spaces');
-                      setOpenDropdown(null);
-                    }}
-                    className="w-full text-left px-3 py-2 text-slate-800 hover:bg-slate-100 rounded-md font-semibold flex items-center justify-between cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Icons.Compass className="w-3.5 h-3.5 text-[#0052cc]" />
-                      <span>View all spaces & projects</span>
-                    </span>
-                    <Icons.ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onOpenCreateProject();
-                      setOpenDropdown(null);
-                    }}
-                    className="w-full text-left px-3 py-2 text-[#0052cc] hover:bg-blue-50/60 rounded-md font-semibold flex items-center gap-2 cursor-pointer"
-                  >
-                    <Icons.Plus className="w-3.5 h-3.5" />
-                    <span>Create new project</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Filters & JQL */}
-          <div className="relative">
-            <button
-              onClick={() => toggleDropdown('filters')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-md hover:bg-[#EBECF0] hover:text-[#172B4D] transition cursor-pointer ${
-                activeView === 'search' || openDropdown === 'filters' ? 'bg-[#EBECF0] text-[#0052cc] font-bold' : ''
-              }`}
-            >
-              <span>Filters</span>
-              <Icons.ChevronDown className="w-3 h-3 opacity-60" />
-            </button>
-
-            {openDropdown === 'filters' && (
-              <div className="absolute left-0 top-full mt-1.5 w-68 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs">
-                <div
-                  onClick={() => { setActiveView('search'); setOpenDropdown(null); }}
-                  className="px-3 py-2.5 hover:bg-slate-50 cursor-pointer text-[#0052cc] font-bold flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-2">
-                    <Icons.Search className="w-3.5 h-3.5 text-[#0052cc]" />
-                    <span>View all issues & JQL search</span>
-                  </span>
-                  <span className="text-[10px] bg-blue-100 text-[#0052cc] px-1.5 py-0.2 rounded font-mono font-bold">
-                    JQL
-                  </span>
-                </div>
-
-                <div className="border-t border-slate-100 my-1" />
-                <div className="px-3 py-1 font-bold text-slate-400 uppercase text-[10px]">Saved Filters</div>
-
-                <div
-                  onClick={() => { setActiveView('search'); setOpenDropdown(null); }}
-                  className="px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                  <span>My open issues</span>
-                </div>
-                <div
-                  onClick={() => { setActiveView('search'); setOpenDropdown(null); }}
-                  className="px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                  <span>Reported by me</span>
-                </div>
-                <div
-                  onClick={() => { setActiveView('search'); setOpenDropdown(null); }}
-                  className="px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                  <span>High priority & Blocker bugs</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Dashboards */}
-          <div className="relative">
-            <button
-              onClick={() => toggleDropdown('dashboards')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-md hover:bg-[#EBECF0] hover:text-[#172B4D] transition cursor-pointer ${
-                activeView === 'reports' || openDropdown === 'dashboards' ? 'bg-[#EBECF0] text-[#0052cc] font-bold' : ''
-              }`}
-            >
-              <span>Dashboards</span>
-              <Icons.ChevronDown className="w-3 h-3 opacity-60" />
-            </button>
-
-            {openDropdown === 'dashboards' && (
-              <div className="absolute left-0 top-full mt-1.5 w-60 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs">
-                <div className="px-3 py-1 font-bold text-slate-400 uppercase text-[10px]">Dashboards</div>
-                <div
-                  onClick={() => { setActiveView('reports'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.BarChart className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Sprint Velocity & Burndown</span>
-                </div>
-                <div
-                  onClick={() => { setActiveView('reports'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Database className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Team Workload & Distribution</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Teams */}
-          <div className="relative">
-            <button
-              onClick={() => toggleDropdown('teams')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-md hover:bg-[#EBECF0] hover:text-[#172B4D] transition cursor-pointer ${
-                activeView === 'users' || openDropdown === 'teams' ? 'bg-[#EBECF0] text-[#0052cc] font-bold' : ''
-              }`}
-            >
-              <span>Teams</span>
-              <Icons.ChevronDown className="w-3 h-3 opacity-60" />
-            </button>
-
-            {openDropdown === 'teams' && (
-              <div className="absolute left-0 top-full mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs">
-                <div className="px-3 py-1 font-bold text-slate-400 uppercase text-[10px]">Organization & Squads</div>
-                <div
-                  onClick={() => { setActiveView('users'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Users className="w-3.5 h-3.5 text-[#0052cc]" />
-                  <span>People Directory & External Staff</span>
-                </div>
-                <div
-                  onClick={() => { setActiveView('users'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Kanban className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Agile Squads & Cross-Functional Teams</span>
-                </div>
-                <div
-                  onClick={() => { setActiveView('users'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Shield className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Permission Schemes Matrix</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Apps / Studio */}
-          <div className="relative">
-            <button
-              onClick={() => toggleDropdown('apps')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-md hover:bg-[#EBECF0] hover:text-[#172B4D] transition cursor-pointer ${
-                activeView === 'config' || activeView === 'import-export' || openDropdown === 'apps' ? 'bg-[#EBECF0] text-[#0052cc] font-bold' : ''
-              }`}
-            >
-              <span>Apps</span>
-              <Icons.ChevronDown className="w-3 h-3 opacity-60" />
-            </button>
-
-            {openDropdown === 'apps' && (
-              <div className="absolute left-0 top-full mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs">
-                <div className="px-3 py-1 font-bold text-slate-400 uppercase text-[10px]">Project Customization</div>
-                <div
-                  onClick={() => { setActiveView('config'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Compass className="w-3.5 h-3.5 text-[#0052cc]" />
-                  <span>Workflow Studio (Canvas)</span>
-                </div>
-                <div
-                  onClick={() => { setActiveView('config'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Automation Rules Engine</span>
-                </div>
-                <div
-                  onClick={() => { setActiveView('import-export'); setOpenDropdown(null); }}
-                  className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-slate-800 flex items-center gap-2"
-                >
-                  <Icons.Download className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Jira Migration & Import/Export</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </nav>
-
-        {/* Primary "+ Create" Button */}
+      {/* ------------------------------------------------------------- */}
+      {/* CENTER: Search + Create (Jira top bar) */}
+      {/* ------------------------------------------------------------- */}
+      <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-2 px-3">
         <button
-          onClick={onOpenCreateIssue}
-          className="ml-2 bg-[#0052CC] hover:bg-[#0065FF] text-white px-3.5 py-1.5 rounded-md text-xs font-bold shadow-xs flex items-center gap-1.5 transition active:scale-98 cursor-pointer"
+          type="button"
+          onClick={onOpenCommandPalette}
+          className="flex-1 max-w-[680px] min-w-0 h-8 flex items-center gap-2 px-2.5 rounded-[3px] border border-[#DFE1E6] bg-white hover:bg-[#F4F5F7] hover:border-[#C1C7D0] text-sm text-[#5E6C84] cursor-text transition"
+          title="Search Jira (Ctrl+K)"
         >
-          <Icons.Plus className="w-3.5 h-3.5" />
+          <Icons.Search className="w-4 h-4 shrink-0 text-[#42526E]" />
+          <span className="flex-1 text-left truncate">Search</span>
+          <kbd className="px-1.5 py-px bg-[#F4F5F7] rounded border border-[#DFE1E6] text-[10px] text-[#5E6C84] font-mono">
+            Ctrl K
+          </kbd>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenCreateIssue}
+          className="h-8 shrink-0 bg-[#0052CC] hover:bg-[#0065FF] active:bg-[#0747A6] text-white px-3 rounded-[3px] text-sm font-semibold flex items-center gap-1.5 transition cursor-pointer"
+        >
+          <Icons.Plus className="w-4 h-4" />
           <span>Create</span>
         </button>
       </div>
@@ -676,36 +369,23 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* RIGHT SECTION: Quick Search + Database Pill + Tools + Profile */}
       {/* ------------------------------------------------------------- */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
-        {/* Mobile/Tablet Search Button */}
         <button
           type="button"
           onClick={onOpenCommandPalette}
-          className="xl:hidden p-2 text-[#42526E] hover:text-[#172B4D] hover:bg-[#EBECF0] rounded-full transition cursor-pointer"
+          className="md:hidden p-2 text-[#42526E] hover:text-[#172B4D] hover:bg-[#EBECF0] rounded-full transition cursor-pointer"
           title="Search Jira (Ctrl+K)"
         >
           <Icons.Search className="w-4 h-4" />
         </button>
-
-        {/* Atlassian Jira Desktop Search Box with Command Palette */}
-        <div
-          onClick={onOpenCommandPalette}
-          className="hidden xl:flex items-center gap-2 bg-[#F4F5F7] hover:bg-[#EBECF0] border border-[#DFE1E6] rounded-lg px-2.5 py-1.5 text-xs text-[#5E6C84] cursor-pointer w-44 transition"
+        <button
+          type="button"
+          onClick={onOpenCreateIssue}
+          className="md:hidden p-1.5 bg-[#0052CC] hover:bg-[#0065FF] text-white rounded-[3px] transition cursor-pointer"
+          title="Create"
+          aria-label="Create"
         >
-          <Icons.Search className="w-3.5 h-3.5 shrink-0 text-[#6B778C]" />
-          <span className="flex-1 truncate">Search</span>
-          <kbd className="px-1.5 py-0.2 bg-white rounded border border-[#DFE1E6] text-[10px] text-[#6B778C] font-mono shadow-2xs">
-            Ctrl K
-          </kbd>
-        </div>
-
-        {/* Remote PostgreSQL status pill */}
-        <div
-          title="Connected to remote PostgreSQL db_a66689_jira on pg8001.site4now.net:6432"
-          className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E3FCEF] text-[#006644] text-[10px] font-bold border border-[#ABF5D1]"
-        >
-          <span className="w-2 h-2 rounded-full bg-[#36B37E] animate-pulse" />
-          <span>PostgreSQL Active</span>
-        </div>
+          <Icons.Plus className="w-4 h-4" />
+        </button>
 
         {/* Notifications Bell (Directly beside Settings & Profile as per Jira) */}
         <div className="relative">

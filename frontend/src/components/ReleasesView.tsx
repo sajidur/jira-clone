@@ -52,16 +52,11 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ project }) => {
   };
 
   return (
-    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 h-[calc(100vh-3.5rem)] p-4 sm:p-6">
+    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 min-h-0 p-4 sm:p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-200">
           <div>
-            <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-              <span>{project.name}</span>
-              <span>/</span>
-              <span className="font-semibold text-slate-700">Releases</span>
-            </div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
               Versions & Releases
             </h1>

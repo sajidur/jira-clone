@@ -3,13 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { Issue } from '@/types/jira';
 import { Icons, IssueTypeIcon } from './Icons';
+import type { ViewType } from './Navbar';
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   issues: Issue[];
   onSelectIssue: (issue: Issue) => void;
-  onSelectView: (view: 'board' | 'backlog' | 'list' | 'roadmap' | 'reports' | 'releases' | 'config' | 'import-export' | 'search' | 'users') => void;
+  onSelectView: (view: ViewType) => void;
   onOpenCreateIssue: () => void;
 }
 

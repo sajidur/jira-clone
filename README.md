@@ -84,6 +84,25 @@ The frontend calls the API from the browser, so `NEXT_PUBLIC_API_URL` is baked i
 
 ---
 
+## 🧭 Navigation & URLs
+Navigation works like Jira Cloud: every page has its own address, so the browser's Back/Forward buttons, refresh, bookmarks, "open in new tab" and shared links all work. After logging in you land on the page the link pointed to.
+
+| Page | URL |
+|---|---|
+| For you (home) | `/jira/for-you` |
+| Spaces directory | `/jira/projects` |
+| Board | `/jira/software/projects/ERP/boards/1` |
+| Backlog · Timeline · Reports | `/jira/software/projects/ERP/boards/1/backlog` · `/timeline` · `/reports` |
+| List · Releases · Space settings | `/jira/software/projects/ERP/list` · `/versions` · `/settings` |
+| Issue | `/browse/ERP-12`, or `?selectedIssue=ERP-12` on any page |
+| Search (JQL) · People | `/issues` · `/jira/people` |
+| Workspace settings · Import & export | `/jira/settings/workspace` · `/jira/settings/system/import-export` |
+| Administration | `/admin`, `/admin/users`, `/admin/sessions`, `/admin/email` |
+
+The top bar has search and **Create** in the middle; the sidebar has For you, Recent and Starred menus, your recent spaces, Filters and Dashboards. Inside a space, a shared header shows the space name (click to rename), star, share link and the Timeline / Backlog / Board / List / Reports / Releases tabs.
+
+---
+
 ## 🔐 Login & Administration
 - Every page and API endpoint requires signing in. The login screen accepts a username or an email address.
 - A built-in **`admin`** account is created on first start. Its password comes from `Admin:Password` — `ADMIN_PASSWORD` in `.env` for Docker, or `dotnet user-secrets set "Admin:Password" "<password>"` locally. If none is set, a random password is generated and printed once in the API log. An existing admin password is never overwritten.

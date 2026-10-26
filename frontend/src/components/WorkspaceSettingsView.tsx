@@ -235,7 +235,7 @@ export const WorkspaceSettingsView: React.FC<WorkspaceSettingsViewProps> = ({
   const percentStorage = Math.min(100, Math.round((workspace.storageUsedMb / (workspace.storageLimitMb || 1)) * 100));
 
   return (
-    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 h-[calc(100vh-3.5rem)] p-4 sm:p-6 select-none font-sans">
+    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 min-h-0 p-4 sm:p-6 select-none font-sans">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">

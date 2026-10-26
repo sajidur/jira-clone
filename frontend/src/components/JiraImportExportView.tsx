@@ -69,7 +69,7 @@ export const JiraImportExportView: React.FC<JiraImportExportViewProps> = ({
   };
 
   return (
-    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 h-[calc(100vh-3.5rem)] p-4 sm:p-6">
+    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 min-h-0 p-4 sm:p-6">
       {/* View Header */}
       <div className="max-w-5xl mx-auto space-y-8">
         <div>

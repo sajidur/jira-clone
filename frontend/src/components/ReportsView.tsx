@@ -56,21 +56,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ project, sprints }) =>
   }, [project.id, selectedSprintId]);
 
   return (
-    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 h-[calc(100vh-3.5rem)] p-4 sm:p-6">
+    <div className="flex-1 min-w-0 w-full overflow-y-auto bg-slate-50 min-h-0 p-4 sm:p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-              <span>Spaces</span>
-              <span>/</span>
-              <div className="flex items-center gap-1 font-medium text-slate-700">
-                <SpaceAvatar project={project} size="xs" />
-                <span>{project.name}</span>
-              </div>
-              <span>/</span>
-              <span className="font-semibold text-slate-900">Reports</span>
-            </div>
             <h1 className="text-2xl font-bold text-[#172B4D] tracking-tight flex items-center gap-2">
               <span>Reports</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold uppercase">

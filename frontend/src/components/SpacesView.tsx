@@ -7,6 +7,7 @@ import { fetchIssues, fetchSprints, updateProject } from '@/lib/api';
 import { ViewType } from './Navbar';
 import { EditSpaceModal } from './EditSpaceModal';
 import { SpaceAvatar } from './SpaceAvatar';
+import { setStarredSpaceIds, useQuickAccess } from '@/lib/recent';
 
 interface SpacesViewProps {
   projects: Project[];
@@ -38,7 +39,7 @@ export const SpacesView: React.FC<SpacesViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-  const [starredIds, setStarredIds] = useState<number[]>([]);
+  const { starredSpaceIds: starredIds } = useQuickAccess();
   const [stats, setStats] = useState<{ [projectId: number]: SpaceStat }>({});
   const [loading, setLoading] = useState(true);
   const [editingSpace, setEditingSpace] = useState<Project | null>(null);
@@ -81,23 +82,12 @@ export const SpacesView: React.FC<SpacesViewProps> = ({
     if (onProjectUpdated) onProjectUpdated(updated);
   };
 
-  // Load Starred from localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('jira_starred_spaces');
-      if (stored) setStarredIds(JSON.parse(stored));
-    } catch {}
-  }, []);
-
   const toggleStar = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     const updated = starredIds.includes(id)
       ? starredIds.filter((x) => x !== id)
       : [...starredIds, id];
-    setStarredIds(updated);
-    try {
-      localStorage.setItem('jira_starred_spaces', JSON.stringify(updated));
-    } catch {}
+    setStarredSpaceIds(updated);
   };
 
   // Load stats and sprints for all projects
