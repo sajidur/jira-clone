@@ -2,11 +2,14 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using JiraClone.Api.Auth;
 using JiraClone.Api.Data;
 using JiraClone.Api.Models;
+using JiraClone.Api.Services.Email;
+using MimeKit;
 
 namespace JiraClone.Api.Controllers;
 
@@ -37,6 +40,30 @@ public class AdminSetPasswordDto
     public string Password { get; set; } = string.Empty;
 }
 
+public class AdminPasswordEmailDto
+{
+    public string Purpose { get; set; } = PasswordResetPurpose.Reset; // "reset" or "invite"
+}
+
+public class SmtpSettingsDto
+{
+    public bool IsEnabled { get; set; }
+    public string Host { get; set; } = string.Empty;
+    public int Port { get; set; } = 587;
+    public string Security { get; set; } = SmtpSecurity.StartTls;
+    public string? Username { get; set; }
+    public string? Password { get; set; } // null or empty keeps the saved password
+    public bool ClearPassword { get; set; }
+    public string FromAddress { get; set; } = string.Empty;
+    public string FromName { get; set; } = "Jira";
+    public string SiteUrl { get; set; } = string.Empty;
+}
+
+public class SmtpTestDto : SmtpSettingsDto
+{
+    public string To { get; set; } = string.Empty;
+}
+
 [ApiController]
 [Route("api/admin")]
 [Authorize(Roles = ClaimsPrincipalExtensions.AdministratorRole)]
@@ -44,11 +71,16 @@ public class AdminController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly CredentialValidator _credentials;
+    private readonly EmailService _email;
+    private readonly PasswordResetService _passwordResets;
 
-    public AdminController(AppDbContext db, CredentialValidator credentials)
+    public AdminController(AppDbContext db, CredentialValidator credentials, EmailService email,
+        PasswordResetService passwordResets)
     {
         _db = db;
         _credentials = credentials;
+        _email = email;
+        _passwordResets = passwordResets;
     }
 
     [HttpGet("overview")]
@@ -172,6 +204,35 @@ public class AdminController : ControllerBase
         return Ok(ToAdminUser(user, await CountActiveSessionsAsync(user.Id)));
     }
 
+    [HttpPost("users/{id:int}/password-email")]
+    public async Task<IActionResult> SendPasswordEmail(int id, [FromBody] AdminPasswordEmailDto dto)
+    {
+        var user = await _db.AppUsers.FindAsync(id);
+        if (user == null) return NotFound();
+        if (!user.Active) return BadRequest(new { message = "Reactivate this user before sending them an email." });
+        if (!MailboxAddress.TryParse(user.EmailAddress, out _))
+            return BadRequest(new { message = $"{user.DisplayName} doesn't have a valid email address." });
+
+        var settings = await _email.GetSettingsAsync();
+        if (!settings.IsReady)
+            return BadRequest(new { message = "Set up outgoing email in Administration → Email first." });
+
+        var purpose = dto.Purpose == PasswordResetPurpose.Invite ? PasswordResetPurpose.Invite : PasswordResetPurpose.Reset;
+        var message = await _passwordResets.CreateEmailAsync(user, purpose, settings.SiteUrl,
+            HttpContext.Connection.RemoteIpAddress?.ToString(), enforceCooldown: false);
+
+        try
+        {
+            await _email.SendWithSavedSettingsAsync(message!, HttpContext.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = EmailService.DescribeFailure(ex) });
+        }
+
+        return Ok(new { message = $"Email sent to {user.EmailAddress}." });
+    }
+
     [HttpPost("users/{id:int}/sign-out")]
     public async Task<IActionResult> SignOutUser(int id)
     {
@@ -215,6 +276,106 @@ public class AdminController : ControllerBase
         var deleted = await _db.UserSessions.Where(s => s.Id == id).ExecuteDeleteAsync();
         return deleted == 0 ? NotFound() : NoContent();
     }
+
+    [HttpGet("smtp")]
+    public async Task<IActionResult> GetSmtpSettings() => Ok(ToSmtpResponse(await _email.GetSettingsAsync()));
+
+    [HttpPut("smtp")]
+    public async Task<IActionResult> SaveSmtpSettings([FromBody] SmtpSettingsDto dto)
+    {
+        var error = ValidateSmtp(dto, requireComplete: dto.IsEnabled, requireSiteUrl: dto.IsEnabled);
+        if (error != null) return BadRequest(new { message = error });
+
+        var settings = await _db.SmtpSettings.OrderBy(s => s.Id).FirstOrDefaultAsync();
+        if (settings == null)
+        {
+            settings = new SmtpSettings();
+            _db.SmtpSettings.Add(settings);
+        }
+
+        ApplySmtp(settings, dto);
+        if (dto.ClearPassword) settings.EncryptedPassword = null;
+        else if (!string.IsNullOrEmpty(dto.Password)) settings.EncryptedPassword = _email.ProtectPassword(dto.Password);
+        settings.UpdatedAt = DateTime.UtcNow;
+        settings.UpdatedBy = User.GetDisplayName();
+
+        await _db.SaveChangesAsync();
+        return Ok(ToSmtpResponse(settings));
+    }
+
+    /// <summary>Sends a test email with the submitted (possibly unsaved) settings.</summary>
+    [HttpPost("smtp/test")]
+    public async Task<IActionResult> TestSmtpSettings([FromBody] SmtpTestDto dto)
+    {
+        if (!MailboxAddress.TryParse(dto.To, out _))
+            return BadRequest(new { message = "Enter a valid recipient email address." });
+
+        var error = ValidateSmtp(dto, requireComplete: true, requireSiteUrl: false);
+        if (error != null) return BadRequest(new { message = error });
+
+        var saved = await _email.GetSettingsAsync();
+        var settings = new SmtpSettings();
+        ApplySmtp(settings, dto);
+
+        var password = dto.ClearPassword ? null
+            : !string.IsNullOrEmpty(dto.Password) ? dto.Password
+            : _email.TryUnprotectPassword(saved);
+
+        try
+        {
+            await EmailService.SendAsync(settings, password, EmailTemplates.Test(dto.To.Trim(), settings.SiteUrl),
+                HttpContext.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = EmailService.DescribeFailure(ex) });
+        }
+
+        return Ok(new { message = $"Test email sent to {dto.To.Trim()}." });
+    }
+
+    private static string? ValidateSmtp(SmtpSettingsDto dto, bool requireComplete, bool requireSiteUrl)
+    {
+        if (!requireComplete) return null;
+
+        if (string.IsNullOrWhiteSpace(dto.Host)) return "Enter the SMTP server host.";
+        if (dto.Port is < 1 or > 65535) return "Enter a port between 1 and 65535.";
+        if (!SmtpSecurity.All.Contains(dto.Security)) return "Choose a valid connection security option.";
+        if (!MailboxAddress.TryParse(dto.FromAddress, out _)) return "Enter a valid sender (From) email address.";
+        if (requireSiteUrl &&
+            !(Uri.TryCreate(dto.SiteUrl?.Trim(), UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https")))
+            return "Enter the Jira site URL people open in their browser, e.g. http://194.233.85.194:3001";
+        return null;
+    }
+
+    private static void ApplySmtp(SmtpSettings settings, SmtpSettingsDto dto)
+    {
+        settings.IsEnabled = dto.IsEnabled;
+        settings.Host = dto.Host?.Trim() ?? string.Empty;
+        settings.Port = dto.Port;
+        settings.Security = SmtpSecurity.All.Contains(dto.Security) ? dto.Security : SmtpSecurity.StartTls;
+        settings.Username = string.IsNullOrWhiteSpace(dto.Username) ? null : dto.Username.Trim();
+        settings.FromAddress = dto.FromAddress?.Trim() ?? string.Empty;
+        settings.FromName = string.IsNullOrWhiteSpace(dto.FromName) ? "Jira" : dto.FromName.Trim();
+        settings.SiteUrl = dto.SiteUrl?.Trim().TrimEnd('/') ?? string.Empty;
+    }
+
+    private object ToSmtpResponse(SmtpSettings s) => new
+    {
+        s.IsEnabled,
+        s.Host,
+        s.Port,
+        s.Security,
+        s.Username,
+        hasPassword = s.EncryptedPassword != null,
+        passwordUnreadable = s.EncryptedPassword != null && _email.TryUnprotectPassword(s) == null,
+        s.FromAddress,
+        s.FromName,
+        s.SiteUrl,
+        isReady = s.IsReady,
+        updatedAt = s.Id == 0 ? (DateTime?)null : s.UpdatedAt,
+        s.UpdatedBy
+    };
 
     // Signs the user out everywhere, except the admin's own current session
     private Task<int> SignOutAsync(int userId)

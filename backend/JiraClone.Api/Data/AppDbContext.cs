@@ -1,9 +1,10 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using JiraClone.Api.Models;
 
 namespace JiraClone.Api.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext : DbContext, IDataProtectionKeyContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -17,6 +18,9 @@ public class AppDbContext : DbContext
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<SmtpSettings> SmtpSettings => Set<SmtpSettings>();
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<ProjectVersion> ProjectVersions => Set<ProjectVersion>();
     public DbSet<ProjectWorkflowStatus> ProjectWorkflowStatuses => Set<ProjectWorkflowStatus>();
     public DbSet<CustomFieldDefinition> CustomFieldDefinitions => Set<CustomFieldDefinition>();
@@ -279,6 +283,25 @@ public class AppDbContext : DbContext
             entity.Property(e => e.TokenHash).HasMaxLength(64).IsRequired();
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<PasswordResetToken>(entity =>
+        {
+            entity.ToTable("password_reset_tokens");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.Property(e => e.TokenHash).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.Purpose).HasMaxLength(20).IsRequired();
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SmtpSettings>(entity =>
+        {
+            entity.ToTable("smtp_settings");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Security).HasMaxLength(20).IsRequired();
+        });
+
+        modelBuilder.Entity<DataProtectionKey>(entity => entity.ToTable("data_protection_keys"));
 
         modelBuilder.Entity<Workspace>(entity =>
         {

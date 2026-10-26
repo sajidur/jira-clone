@@ -146,6 +146,37 @@ export interface AdminSession {
   isCurrent: boolean;
 }
 
+export type SmtpSecurity = 'StartTls' | 'SslOnConnect' | 'None';
+
+export interface SmtpSettings {
+  isEnabled: boolean;
+  host: string;
+  port: number;
+  security: SmtpSecurity;
+  username?: string | null;
+  hasPassword: boolean;
+  passwordUnreadable: boolean;
+  fromAddress: string;
+  fromName: string;
+  siteUrl: string;
+  isReady: boolean;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+export interface SmtpSettingsInput {
+  isEnabled: boolean;
+  host: string;
+  port: number;
+  security: SmtpSecurity;
+  username?: string;
+  password?: string; // empty keeps the saved password
+  clearPassword?: boolean;
+  fromAddress: string;
+  fromName: string;
+  siteUrl: string;
+}
+
 export interface AdminOverview {
   totalUsers: number;
   activeUsers: number;

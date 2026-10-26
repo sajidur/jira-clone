@@ -35,7 +35,9 @@ import {
   NotificationsResponse,
   AdminUser,
   AdminSession,
-  AdminOverview
+  AdminOverview,
+  SmtpSettings,
+  SmtpSettingsInput
 } from '@/types/jira';
 import { API_BASE, authFetch, withAccessToken } from './auth';
 
@@ -1205,4 +1207,25 @@ export function fetchAdminSessions(): Promise<AdminSession[]> {
 
 export function adminRevokeSession(id: number): Promise<void> {
   return adminRequest(`/sessions/${id}`, { method: 'DELETE' }, 'Failed to revoke session');
+}
+
+export function adminSendPasswordEmail(id: number, purpose: 'reset' | 'invite'): Promise<{ message: string }> {
+  return adminRequest(
+    `/users/${id}/password-email`,
+    { method: 'POST', body: JSON.stringify({ purpose }) },
+    'Failed to send email'
+  );
+}
+
+export function fetchSmtpSettings(): Promise<SmtpSettings> {
+  return adminRequest('/smtp', {}, 'Failed to load email settings');
+}
+
+export function saveSmtpSettings(data: SmtpSettingsInput): Promise<SmtpSettings> {
+  return adminRequest('/smtp', { method: 'PUT', body: JSON.stringify(data) }, 'Failed to save email settings');
+}
+
+/** Sends a test email using the given (possibly unsaved) settings. */
+export function sendSmtpTestEmail(data: SmtpSettingsInput & { to: string }): Promise<{ message: string }> {
+  return adminRequest('/smtp/test', { method: 'POST', body: JSON.stringify(data) }, 'Failed to send test email');
 }

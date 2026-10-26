@@ -95,3 +95,45 @@ export async function changePassword(currentPassword: string, newPassword: strin
     throw new Error(err.message || 'Failed to change password');
   }
 }
+
+export interface ResetLinkInfo {
+  email: string;
+  displayName: string;
+  purpose: 'reset' | 'invite';
+  expiresAt: string;
+}
+
+/** Emails a recovery link. Resolves with the (deliberately generic) confirmation message. */
+export async function requestPasswordReset(email: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 429) throw new Error('Too many requests. Wait a few minutes and try again.');
+    throw new Error(data.message || 'Unable to send a recovery link. Please try again.');
+  }
+  return data.message;
+}
+
+/** Returns details for a valid reset link, or null when it is invalid, expired or used. */
+export async function validateResetLink(token: string): Promise<ResetLinkInfo | null> {
+  const res = await fetch(`${API_BASE}/api/auth/reset-password?token=${encodeURIComponent(token)}`, { cache: 'no-store' });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('Unable to check this link. Please try again.');
+  return res.json();
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, newPassword })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to change your password');
+  }
+}

@@ -33,6 +33,43 @@ public static class DbInitializer
             CREATE INDEX IF NOT EXISTS ""IX_user_sessions_UserId"" ON user_sessions (""UserId"");
         ");
 
+        // Password reset links, outgoing email settings, and Data Protection keys (encrypt the SMTP password)
+        await context.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                ""Id"" serial PRIMARY KEY,
+                ""UserId"" integer NOT NULL REFERENCES app_users(""Id"") ON DELETE CASCADE,
+                ""TokenHash"" character varying(64) NOT NULL,
+                ""Purpose"" character varying(20) NOT NULL DEFAULT 'reset',
+                ""CreatedAt"" timestamp without time zone NOT NULL,
+                ""ExpiresAt"" timestamp without time zone NOT NULL,
+                ""UsedAt"" timestamp without time zone NULL,
+                ""RequestedIp"" text NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_password_reset_tokens_TokenHash"" ON password_reset_tokens (""TokenHash"");
+            CREATE INDEX IF NOT EXISTS ""IX_password_reset_tokens_UserId"" ON password_reset_tokens (""UserId"");
+
+            CREATE TABLE IF NOT EXISTS smtp_settings (
+                ""Id"" serial PRIMARY KEY,
+                ""IsEnabled"" boolean NOT NULL DEFAULT false,
+                ""Host"" text NOT NULL DEFAULT '',
+                ""Port"" integer NOT NULL DEFAULT 587,
+                ""Security"" character varying(20) NOT NULL DEFAULT 'StartTls',
+                ""Username"" text NULL,
+                ""EncryptedPassword"" text NULL,
+                ""FromAddress"" text NOT NULL DEFAULT '',
+                ""FromName"" text NOT NULL DEFAULT 'Jira',
+                ""SiteUrl"" text NOT NULL DEFAULT '',
+                ""UpdatedAt"" timestamp without time zone NOT NULL,
+                ""UpdatedBy"" text NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS data_protection_keys (
+                ""Id"" serial PRIMARY KEY,
+                ""FriendlyName"" text NULL,
+                ""Xml"" text NULL
+            );
+        ");
+
         // Add any missing columns and tables safely
         try
         {

@@ -15,6 +15,8 @@ using JiraClone.Api.Controllers;
 using JiraClone.Api.Data;
 using JiraClone.Api.Models;
 using JiraClone.Api.Services;
+using JiraClone.Api.Services.Email;
+using Microsoft.AspNetCore.DataProtection;
 
 // Enable Npgsql legacy timestamp behavior so Unspecified DateTimes do not throw exceptions
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -39,6 +41,16 @@ builder.Services.AddHttpContextAccessor();
 // Authentication: session tokens from /api/auth/login (Bearer) or Basic credentials for REST clients
 builder.Services.AddSingleton<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
 builder.Services.AddScoped<CredentialValidator>();
+builder.Services.AddScoped<PasswordResetService>();
+
+// Outgoing email. Data Protection encrypts the saved SMTP password; its keys live in the database so every
+// instance sharing the database (local runs and the container) can decrypt it.
+builder.Services.AddDataProtection()
+    .SetApplicationName("JiraClone")
+    .PersistKeysToDbContext<AppDbContext>();
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddSingleton<EmailQueue>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<EmailQueue>());
 builder.Services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
 builder.Services.AddAuthorization(options =>
@@ -55,6 +67,10 @@ builder.Services.AddRateLimiter(options =>
         RateLimitPartition.GetFixedWindowLimiter(
             "login:" + context.Connection.RemoteIpAddress,
             _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+    options.AddPolicy(AuthController.PasswordResetRateLimitPolicy, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            "reset:" + context.Connection.RemoteIpAddress,
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(10) }));
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         context.Request.Headers.Authorization.ToString().StartsWith("Basic ", StringComparison.OrdinalIgnoreCase)
             ? RateLimitPartition.GetFixedWindowLimiter(

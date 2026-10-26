@@ -105,3 +105,5 @@ The connection string is read from `ConnectionStrings:DefaultConnection`. `appse
 - **Docker / production** – set the `ConnectionStrings__DefaultConnection` environment variable.
 
 Database tables (`projects`, `issues`, `sprints`, `issue_comments`, `worklogs`, `activity_logs`, `app_users`) and initial seed data are automatically verified and initialized on startup.
+
+Admin login: username admin, password Jira-LTwY4UukU9XH
