@@ -1,26 +1,40 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Project, Issue, SavedFilter } from '@/types/jira';
 import { searchJql, fetchSavedFilters, createSavedFilter, deleteSavedFilter } from '@/lib/api';
 import { Icons } from './Icons';
+import { useCurrentUser } from './AuthProvider';
+
+const DEFAULT_JQL = "status in ('In Progress', 'In Review') ORDER BY updated DESC";
 
 interface JqlSearchViewProps {
   currentProject: Project | null;
   onSelectIssue: (issue: Issue) => void;
   onOpenCreateModal: () => void;
+  /** Query from the URL (/issues?jql=…). */
+  initialJql?: string | null;
+  /** Saved filter from the URL (/issues?filter=ID). */
+  initialFilterId?: number | null;
+  /** Called with every query that runs, so the URL can follow it. */
+  onQueryRun?: (jql: string) => void;
 }
 
 export default function JqlSearchView({
   currentProject,
   onSelectIssue,
-  onOpenCreateModal
+  onOpenCreateModal,
+  initialJql,
+  initialFilterId,
+  onQueryRun
 }: JqlSearchViewProps) {
+  const currentUser = useCurrentUser();
+  const lastRunQuery = useRef<string | null>(null);
   // Mode: 'jql' | 'basic'
   const [mode, setMode] = useState<'jql' | 'basic'>('jql');
 
   // Advanced JQL State
-  const [jqlQuery, setJqlQuery] = useState<string>("status in ('In Progress', 'In Review') ORDER BY updated DESC");
+  const [jqlQuery, setJqlQuery] = useState<string>(initialJql || DEFAULT_JQL);
   const [searching, setSearching] = useState<boolean>(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [parsedClauses, setParsedClauses] = useState<string[]>([]);
@@ -43,22 +57,45 @@ export default function JqlSearchView({
   const [newFilterDesc, setNewFilterDesc] = useState<string>('');
   const [savingFilter, setSavingFilter] = useState<boolean>(false);
 
-  // Load Saved Filters on mount
+  // Load saved filters, then run the query or filter from the URL (or the default query)
   useEffect(() => {
-    loadFilters();
-    runSearch(jqlQuery);
+    loadFilters().then((filters) => {
+      const fromUrl = initialFilterId ? filters.find((f) => f.id === initialFilterId) : undefined;
+      if (fromUrl) handleSelectSavedFilter(fromUrl);
+      else runSearch(jqlQuery);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadFilters() {
+  // A filter picked from the navigation while this page is open
+  useEffect(() => {
+    if (lastRunQuery.current === null) return; // first search is handled on mount
+    if (initialFilterId) {
+      const filter = savedFilters.find((f) => f.id === initialFilterId);
+      if (filter && filter.jql !== lastRunQuery.current) handleSelectSavedFilter(filter);
+    } else if (initialJql && initialJql !== lastRunQuery.current) {
+      setActiveFilterId(null);
+      setJqlQuery(initialJql);
+      setMode('jql');
+      runSearch(initialJql);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialJql, initialFilterId]);
+
+  async function loadFilters(): Promise<SavedFilter[]> {
     try {
       const data = await fetchSavedFilters();
       setSavedFilters(data);
+      return data;
     } catch (err) {
       console.error('Failed to load saved filters', err);
+      return [];
     }
   }
 
   async function runSearch(queryToRun: string) {
+    lastRunQuery.current = queryToRun;
+    onQueryRun?.(queryToRun);
     setSearching(true);
     setSearchError(null);
     try {
@@ -109,7 +146,7 @@ export default function JqlSearchView({
         name: newFilterName.trim(),
         jql: jqlQuery,
         description: newFilterDesc.trim() || undefined,
-        ownerName: 'Sajidur Rahman',
+        ownerName: currentUser.displayName,
         isFavorite: true
       });
       setSavedFilters(prev => [created, ...prev]);

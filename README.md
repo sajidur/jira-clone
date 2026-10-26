@@ -99,7 +99,13 @@ Navigation works like Jira Cloud: every page has its own address, so the browser
 | Workspace settings · Import & export | `/jira/settings/workspace` · `/jira/settings/system/import-export` |
 | Administration | `/admin`, `/admin/users`, `/admin/sessions`, `/admin/email` |
 
-The top bar has search and **Create** in the middle; the sidebar has For you, Recent and Starred menus, your recent spaces, Filters and Dashboards. Inside a space, a shared header shows the space name (click to rename), star, share link and the Timeline / Backlog / Board / List / Reports / Releases tabs.
+**Top bar** (like Jira Cloud's): sidebar toggle, app switcher, workspace switcher, search and **Create** in the middle, then notifications, help (help articles, keyboard shortcuts), settings (personal settings, spaces, work items, system, apps; user management and permissions for admins) and your profile (account settings, your work, assigned to me, log out).
+
+**Sidebar**: For you · Recent (spaces and work items) · Starred (spaces and filters) · Apps · Plans · Spaces (starred and recent spaces; expand one to jump to its Timeline, Backlog, Board, List, Reports or Releases; `•••` for space settings and starring) · Filters (Jira's default filters such as *My open work items*, *Reported by me*, *Done work items*, plus your saved filters) · Dashboards · Teams · More. **More → Customize sidebar** shows, hides and reorders items for you only; hidden items stay under More. Collapse the sidebar from the top bar or with `Ctrl + [`.
+
+**Keyboard shortcuts** (press `?` to see them): `/` search, `c` create, `g` then `f`/`p`/`a`/`b`/`i`/`d` for For you, Spaces, Board, Backlog, Search and Dashboards, `1`/`2`/`3` for Backlog/Board/Reports inside a space, `Esc` closes the open work item.
+
+Inside a space, a shared header shows the space name (click to rename), star, share link and the Timeline / Backlog / Board / List / Reports / Releases tabs. Search links work like Jira's issue navigator: `/issues?jql=…` runs a query and `/issues?filter=ID` opens a saved filter.
 
 ---
 

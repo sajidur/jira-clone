@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Project } from '@/types/jira';
 import { PROJECT_VIEWS } from '@/lib/routes';
 import { recordRecentSpace } from '@/lib/recent';
@@ -60,6 +60,7 @@ const EmptyState: React.FC<{
 /** Renders the page the URL points at. */
 export const RouteView: React.FC = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const jira = useJira();
   const nav = useAppNavigation();
   const { isAdmin } = useAuth();
@@ -266,6 +267,16 @@ export const RouteView: React.FC = () => {
           currentProject={jira.selectedProject}
           onSelectIssue={(issue) => nav.openIssue(issue.key)}
           onOpenCreateModal={() => jira.openCreateIssueModal()}
+          initialJql={searchParams.get('jql')}
+          initialFilterId={Number(searchParams.get('filter')) || null}
+          onQueryRun={(jql) => {
+            // Keep the query in the address bar like Jira's issue navigator (no new history entry per search)
+            if (searchParams.get('jql') === jql && !searchParams.get('filter')) return;
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete('filter');
+            params.set('jql', jql);
+            router.replace(`/issues?${params.toString()}`, { scroll: false });
+          }}
         />
       );
     case 'users':

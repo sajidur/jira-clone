@@ -11,7 +11,8 @@ import { SpaceAvatar } from './SpaceAvatar';
 import { Icons } from './Icons';
 import type { ViewType } from './Navbar';
 
-const TABS: { view: ViewType; label: string; icon: React.FC<{ className?: string }> }[] = [
+/** A space's views, in Jira's order. Also listed under an expanded space in the sidebar. */
+export const SPACE_TABS: { view: ViewType; label: string; icon: React.FC<{ className?: string }> }[] = [
   { view: 'roadmap', label: 'Timeline', icon: Icons.Clock },
   { view: 'backlog', label: 'Backlog', icon: Icons.Backlog },
   { view: 'board', label: 'Board', icon: Icons.Kanban },
@@ -229,7 +230,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project, activeVie
       </div>
 
       <nav aria-label="Space views" className="flex items-center gap-1 mt-2 -mb-px overflow-x-auto text-sm">
-        {TABS.map(({ view, label, icon: Icon }) => {
+        {SPACE_TABS.map(({ view, label, icon: Icon }) => {
           const active = activeView === view;
           return (
             <Link

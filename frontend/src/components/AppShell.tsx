@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Workspace } from '@/types/jira';
 import { createWorkspace, fetchIssue, fetchProjects } from '@/lib/api';
 import { PROJECT_VIEWS, viewTitle } from '@/lib/routes';
@@ -18,12 +18,42 @@ import { CreateProjectModal } from './CreateProjectModal';
 import { AccountSettingsModal } from './AccountSettingsModal';
 import { EditSpaceModal } from './EditSpaceModal';
 import { Icons } from './Icons';
+import { ShortcutsDialog, useGlobalShortcuts } from './KeyboardShortcuts';
 
 /** Top bar, sidebar, the page for the current URL, and app-wide dialogs. */
 export const AppShell: React.FC = () => {
   const jira = useJira();
   const nav = useAppNavigation();
   const currentUser = useCurrentUser();
+
+  // ---- Sidebar collapse (remembered in this browser) and keyboard shortcuts ----
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('jira_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      try {
+        localStorage.setItem('jira_sidebar_collapsed', String(!prev));
+      } catch {}
+      return !prev;
+    });
+  }, []);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  useGlobalShortcuts({
+    search: jira.openCommandPalette,
+    create: () => jira.openCreateIssueModal(),
+    showShortcuts: () => setShortcutsOpen(true),
+    toggleSidebar,
+    navigate: (view) => nav.navigate(view),
+    closeIssue: nav.selectedIssueKey ? nav.closeIssue : undefined,
+    inSpace: !!nav.activeView && PROJECT_VIEWS.includes(nav.activeView),
+    issueOpen: !!nav.selectedIssueKey
+  });
 
   // ---- Issue shown on top of the page (from ?selectedIssue= or /browse/KEY) ----
   const [openIssue, setOpenIssue] = useState<{ key: string; id: number; summary: string } | null>(null);
@@ -127,17 +157,20 @@ export const AppShell: React.FC = () => {
         onSelectWorkspace={handleWorkspaceSelect}
         onOpenCreateWorkspace={jira.openCreateWorkspaceModal}
         onOpenCreateIssue={() => jira.openCreateIssueModal()}
-        activeView={nav.activeView}
-        setActiveView={(v) => nav.navigate(v)}
         onOpenCommandPalette={jira.openCommandPalette}
+        onToggleSidebar={toggleSidebar}
+        sidebarCollapsed={sidebarCollapsed}
         onToggleMobileSidebar={() => jira.setMobileSidebarOpen(!jira.isMobileSidebarOpen)}
         isMobileSidebarOpen={jira.isMobileSidebarOpen}
         onOpenAccountSettings={jira.openAccountSettingsModal}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
         onSelectIssue={nav.openIssue}
       />
 
       <div className="flex flex-1 overflow-hidden min-w-0 w-full relative">
         <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={toggleSidebar}
           isMobileOpen={jira.isMobileSidebarOpen}
           onCloseMobile={() => jira.setMobileSidebarOpen(false)}
           onOpenCreateProject={jira.openCreateProjectModal}
@@ -225,6 +258,8 @@ export const AppShell: React.FC = () => {
           }}
         />
       )}
+
+      {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
 
       <AccountSettingsModal
         isOpen={jira.isAccountSettingsOpen}
