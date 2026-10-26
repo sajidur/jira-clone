@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AdminOverview, AdminSession, AdminUser } from '@/types/jira';
+import { AdminOverview, AdminSession, AdminUser, SmtpSettings } from '@/types/jira';
 import {
   fetchAdminOverview,
   fetchAdminUsers,
@@ -11,14 +11,17 @@ import {
   adminSetPassword,
   adminSignOutUser,
   adminRevokeSession,
+  adminSendPasswordEmail,
+  fetchSmtpSettings,
   fetchRoles
 } from '@/lib/api';
 import { useAuth, useCurrentUser, getInitials } from './AuthProvider';
 import { Icons } from './Icons';
 import { Dialog, Lozenge, fieldClass } from './AdminUi';
+import AdminEmailSettings from './AdminEmailSettings';
 import type { ViewType } from './Navbar';
 
-type AdminSection = 'overview' | 'users' | 'sessions';
+type AdminSection = 'overview' | 'users' | 'sessions' | 'email';
 type StatusFilter = 'all' | 'active' | 'deactivated' | 'no-password';
 
 const ADMIN_ROLE = 'Administrator';
@@ -109,6 +112,7 @@ export default function AdminConsoleView({ onNavigateView }: AdminConsoleViewPro
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [sessions, setSessions] = useState<AdminSession[]>([]);
+  const [smtp, setSmtp] = useState<SmtpSettings | null>(null);
   const [roles, setRoles] = useState<string[]>(FALLBACK_ROLES);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -127,14 +131,16 @@ export default function AdminConsoleView({ onNavigateView }: AdminConsoleViewPro
   const reload = useCallback(async () => {
     try {
       setError('');
-      const [overviewData, userData, sessionData] = await Promise.all([
+      const [overviewData, userData, sessionData, smtpData] = await Promise.all([
         fetchAdminOverview(),
         fetchAdminUsers(),
-        fetchAdminSessions()
+        fetchAdminSessions(),
+        fetchSmtpSettings()
       ]);
       setOverview(overviewData);
       setUsers(userData);
       setSessions(sessionData);
+      setSmtp(smtpData);
     } catch (err: any) {
       setError(err.message || 'Failed to load administration data');
     } finally {
@@ -215,6 +221,16 @@ export default function AdminConsoleView({ onNavigateView }: AdminConsoleViewPro
     runAction(() => adminSignOutUser(user.id), `${user.displayName} has been signed out of all devices.`);
   };
 
+  const sendPasswordEmail = (user: AdminUser) => {
+    const purpose = user.hasPassword ? 'reset' : 'invite';
+    runAction(
+      () => adminSendPasswordEmail(user.id, purpose),
+      purpose === 'invite'
+        ? `Invite sent to ${user.emailAddress}. The link works for 3 days.`
+        : `Password reset link sent to ${user.emailAddress}. The link works for 1 hour.`
+    );
+  };
+
   const revokeSession = (session: AdminSession) => {
     if (!confirm(`Sign out ${session.displayName} on ${describeDevice(session.userAgent)}?`)) return;
     runAction(() => adminRevokeSession(session.id), 'Session revoked.');
@@ -262,6 +278,23 @@ export default function AdminConsoleView({ onNavigateView }: AdminConsoleViewPro
               )}
             </button>
           ))}
+
+          <div className="hidden md:block px-2 pt-4 pb-1 text-[11px] font-bold uppercase text-[#5E6C84]">Settings</div>
+          <button
+            type="button"
+            onClick={() => setSection('email')}
+            className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-[3px] text-sm whitespace-nowrap transition cursor-pointer ${
+              section === 'email'
+                ? 'bg-[#DEEBFF] text-[#0052CC] font-semibold'
+                : 'text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]'
+            }`}
+          >
+            <Icons.Mail className="w-4 h-4" />
+            <span className="flex-1 text-left">Email (SMTP)</span>
+            {smtp && !smtp.isReady && (
+              <span className="w-2 h-2 rounded-full bg-[#FF991F]" title="Not set up" aria-label="Not set up" />
+            )}
+          </button>
 
           <div className="hidden md:block px-2 pt-4 pb-1 text-[11px] font-bold uppercase text-[#5E6C84]">
             Access & products
@@ -311,9 +344,13 @@ export default function AdminConsoleView({ onNavigateView }: AdminConsoleViewPro
               <Icons.Refresh className="w-4 h-4 animate-spin text-[#0052CC]" />
               Loading administration…
             </div>
+          ) : section === 'email' ? (
+            smtp && <AdminEmailSettings settings={smtp} onSaved={setSmtp} />
           ) : section === 'overview' ? (
             <OverviewSection
               overview={overview}
+              emailReady={!!smtp?.isReady}
+              onSetUpEmail={() => setSection('email')}
               onCreateUser={() => setUserForm({ mode: 'create' })}
               onShowUsers={(filter) => {
                 setStatusFilter(filter);
@@ -557,6 +594,11 @@ export default function AdminConsoleView({ onNavigateView }: AdminConsoleViewPro
                 <>
                   {item('Edit details', () => setUserForm({ mode: 'edit', user: u }))}
                   {item(u.hasPassword ? 'Reset password' : 'Set password', () => setPasswordTarget(u))}
+                  {smtp?.isReady &&
+                    u.active &&
+                    item(u.hasPassword ? 'Email a password reset link' : 'Email an invite to set a password', () =>
+                      sendPasswordEmail(u)
+                    )}
                   {u.activeSessions > 0 && item('Sign out of all devices', () => signOutEverywhere(u))}
                   {!isSelf && u.active && (
                     <>
@@ -580,10 +622,12 @@ export default function AdminConsoleView({ onNavigateView }: AdminConsoleViewPro
           user={userForm.mode === 'edit' ? userForm.user : undefined}
           roles={roles}
           canChangeRole={userForm.mode === 'create' || userForm.user.id !== me.id}
+          canEmailInvite={!!smtp?.isReady}
           onClose={() => setUserForm(null)}
-          onSaved={async (message, savedUserId) => {
+          onSaved={async (message, savedUserId, warning) => {
             setUserForm(null);
             setNotice(message);
+            if (warning) setError(warning);
             await reload();
             if (savedUserId === me.id) await refreshUser();
           }}
@@ -608,11 +652,13 @@ export default function AdminConsoleView({ onNavigateView }: AdminConsoleViewPro
 
 const OverviewSection: React.FC<{
   overview: AdminOverview | null;
+  emailReady: boolean;
+  onSetUpEmail: () => void;
   onCreateUser: () => void;
   onShowUsers: (filter: StatusFilter) => void;
   onShowSessions: () => void;
   onNavigateView: (view: ViewType) => void;
-}> = ({ overview, onCreateUser, onShowUsers, onShowSessions, onNavigateView }) => {
+}> = ({ overview, emailReady, onSetUpEmail, onCreateUser, onShowUsers, onShowSessions, onNavigateView }) => {
   if (!overview) return null;
 
   const stats = [
@@ -649,6 +695,23 @@ const OverviewSection: React.FC<{
         <h1 className="text-2xl font-semibold text-[#172B4D]">Overview</h1>
         <p className="text-sm text-[#5E6C84] mt-1">Who can access this Jira site and how they sign in.</p>
       </div>
+
+      {!emailReady && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-[3px] border border-[#FFE380] bg-[#FFFAE6] px-4 py-3">
+          <Icons.Mail className="w-5 h-5 shrink-0 text-[#974F0C]" />
+          <div className="flex-1 text-sm text-[#172B4D]">
+            <span className="font-semibold">Outgoing email isn&apos;t set up.</span> Users can&apos;t reset forgotten
+            passwords themselves, and you can&apos;t email invites.
+          </div>
+          <button
+            type="button"
+            onClick={onSetUpEmail}
+            className="self-start sm:self-auto h-8 px-3 rounded-[3px] bg-[#0052CC] hover:bg-[#0065FF] text-white text-sm font-semibold whitespace-nowrap cursor-pointer"
+          >
+            Set up email
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map((s) => (
@@ -702,6 +765,11 @@ const OverviewSection: React.FC<{
                 onClick: () => onShowUsers('no-password')
               },
               { label: 'Review active sessions', icon: <Icons.Shield className="w-4 h-4" />, onClick: onShowSessions },
+              {
+                label: emailReady ? 'Email (SMTP) settings' : 'Set up outgoing email',
+                icon: <Icons.Mail className="w-4 h-4" />,
+                onClick: onSetUpEmail
+              },
               {
                 label: 'Groups & permission schemes',
                 icon: <Icons.Lock className="w-4 h-4" />,
@@ -791,9 +859,10 @@ const UserFormDialog: React.FC<{
   user?: AdminUser;
   roles: string[];
   canChangeRole: boolean;
+  canEmailInvite: boolean;
   onClose: () => void;
-  onSaved: (message: string, userId: number) => void;
-}> = ({ mode, user, roles, canChangeRole, onClose, onSaved }) => {
+  onSaved: (message: string, userId: number, warning?: string) => void;
+}> = ({ mode, user, roles, canChangeRole, canEmailInvite, onClose, onSaved }) => {
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [email, setEmail] = useState(user?.emailAddress ?? '');
   const [username, setUsername] = useState(user?.name ?? '');
@@ -801,6 +870,7 @@ const UserFormDialog: React.FC<{
   const [jobTitle, setJobTitle] = useState(user?.jobTitle ?? '');
   const [department, setDepartment] = useState(user?.department ?? '');
   const [password, setPassword] = useState(mode === 'create' ? generatePassword() : '');
+  const [emailInvite, setEmailInvite] = useState(canEmailInvite);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -827,7 +897,20 @@ const UserFormDialog: React.FC<{
       };
       if (mode === 'create') {
         const created = await adminCreateUser({ ...details, password });
-        onSaved(`${created.displayName} can now log in as @${created.name}.`, created.id);
+        if (emailInvite) {
+          try {
+            await adminSendPasswordEmail(created.id, 'invite');
+            onSaved(`${created.displayName} was created and invited by email at ${created.emailAddress}.`, created.id);
+          } catch (err: any) {
+            onSaved(
+              `${created.displayName} was created.`,
+              created.id,
+              `The invite email couldn't be sent: ${err.message}. Set a password for them from the user menu instead.`
+            );
+          }
+        } else {
+          onSaved(`${created.displayName} can now log in as @${created.name}.`, created.id);
+        }
       } else {
         const updated = await adminUpdateUser(user!.id, canChangeRole ? details : { ...details, role: undefined });
         onSaved(`${updated.displayName}'s details were saved.`, updated.id);
@@ -921,7 +1004,21 @@ const UserFormDialog: React.FC<{
               className={fieldClass}
             />
           </div>
-          {mode === 'create' && (
+          {mode === 'create' && canEmailInvite && (
+            <label className="sm:col-span-2 flex items-start gap-2 text-sm text-[#172B4D] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={emailInvite}
+                onChange={(e) => setEmailInvite(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-[#0052CC] cursor-pointer"
+              />
+              <span>
+                Email them an invite to choose their own password
+                <span className="block text-xs text-[#5E6C84]">The link works for 3 days.</span>
+              </span>
+            </label>
+          )}
+          {mode === 'create' && !emailInvite && (
             <div className="sm:col-span-2">
               <label htmlFor="admin-user-password" className="block text-xs font-semibold text-[#5E6C84] mb-1">
                 Password <span className="text-[#DE350B]">*</span>

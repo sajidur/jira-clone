@@ -140,7 +140,10 @@ export const ResetPasswordPage: React.FC = () => {
               autoComplete="new-password"
               placeholder="New password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError('');
+              }}
               className={`${authInputClass} pr-10`}
             />
             <button
@@ -177,7 +180,10 @@ export const ResetPasswordPage: React.FC = () => {
             autoComplete="new-password"
             placeholder="Confirm new password"
             value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
+            onChange={(e) => {
+              setConfirm(e.target.value);
+              setError('');
+            }}
             className={authInputClass}
           />
         </div>

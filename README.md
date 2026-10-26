@@ -92,6 +92,11 @@ The frontend calls the API from the browser, so `NEXT_PUBLIC_API_URL` is baked i
 - Jira REST API clients can use HTTP Basic auth (`curl -u admin:<password> http://<host>:5050/rest/api/2/myself`) or a session token (`Authorization: Bearer <token>` from `POST /api/auth/login`).
 - Login attempts are limited to 10 per minute per IP address.
 
+### Forgot password & email (SMTP)
+- Administrators configure the outgoing mail server in **Administration → Email (SMTP)**: host, port, security (STARTTLS / SSL/TLS / none), username, password, sender, and the Jira site URL used in links. Use **Send test email** to check the settings before saving. The SMTP password is stored encrypted (ASP.NET Data Protection, keys kept in the `data_protection_keys` table) and is never returned by the API.
+- **Can't log in?** on the login screen emails a recovery link. The link opens `/reset-password`, expires after 1 hour, works once, and signs the user out everywhere when used. The response is the same whether or not the account exists, at most one email per account is sent every 2 minutes, and requests are limited to 5 per 10 minutes per IP address.
+- From **Administration → Users**, admins can email a password reset link or an invite (a 3-day link to choose a first password), and can invite people by email when creating them.
+
 ---
 
 ## 🗄️ Database Configuration

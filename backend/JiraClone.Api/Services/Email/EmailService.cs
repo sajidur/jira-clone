@@ -89,6 +89,14 @@ public class EmailService
         await client.DisconnectAsync(true, cancellationToken);
     }
 
+    /// <summary>A parseable address with a local part and a domain (MimeKit alone accepts "name" without "@domain").</summary>
+    public static bool IsValidAddress(string? value)
+    {
+        if (!MailboxAddress.TryParse(value?.Trim() ?? string.Empty, out var mailbox)) return false;
+        var at = mailbox.Address.IndexOf('@');
+        return at > 0 && at < mailbox.Address.Length - 1;
+    }
+
     /// <summary>Turns MailKit and socket failures into a message an administrator can act on.</summary>
     public static string DescribeFailure(Exception ex) => ex switch
     {

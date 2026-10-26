@@ -9,7 +9,6 @@ using JiraClone.Api.Auth;
 using JiraClone.Api.Data;
 using JiraClone.Api.Models;
 using JiraClone.Api.Services.Email;
-using MimeKit;
 
 namespace JiraClone.Api.Controllers;
 
@@ -210,7 +209,7 @@ public class AdminController : ControllerBase
         var user = await _db.AppUsers.FindAsync(id);
         if (user == null) return NotFound();
         if (!user.Active) return BadRequest(new { message = "Reactivate this user before sending them an email." });
-        if (!MailboxAddress.TryParse(user.EmailAddress, out _))
+        if (!EmailService.IsValidAddress(user.EmailAddress))
             return BadRequest(new { message = $"{user.DisplayName} doesn't have a valid email address." });
 
         var settings = await _email.GetSettingsAsync();
@@ -307,7 +306,7 @@ public class AdminController : ControllerBase
     [HttpPost("smtp/test")]
     public async Task<IActionResult> TestSmtpSettings([FromBody] SmtpTestDto dto)
     {
-        if (!MailboxAddress.TryParse(dto.To, out _))
+        if (!EmailService.IsValidAddress(dto.To))
             return BadRequest(new { message = "Enter a valid recipient email address." });
 
         var error = ValidateSmtp(dto, requireComplete: true, requireSiteUrl: false);
@@ -341,7 +340,7 @@ public class AdminController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.Host)) return "Enter the SMTP server host.";
         if (dto.Port is < 1 or > 65535) return "Enter a port between 1 and 65535.";
         if (!SmtpSecurity.All.Contains(dto.Security)) return "Choose a valid connection security option.";
-        if (!MailboxAddress.TryParse(dto.FromAddress, out _)) return "Enter a valid sender (From) email address.";
+        if (!EmailService.IsValidAddress(dto.FromAddress)) return "Enter a valid sender (From) email address.";
         if (requireSiteUrl &&
             !(Uri.TryCreate(dto.SiteUrl?.Trim(), UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https")))
             return "Enter the Jira site URL people open in their browser, e.g. http://194.233.85.194:3001";
